@@ -1,0 +1,14 @@
+{
+  "name": "iris-parking-os",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_OPTIONS=--no-warnings node src/server/server.js",
+    "start": "NODE_OPTIONS=--no-warnings NODE_ENV=production node src/server/server.js",
+    "check": "find src public/js -name '*.js' -print0 | xargs -0 -n1 node --check"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
