@@ -1,65 +1,231 @@
 import { brand, escapeHtml } from '../components.js';
 
-const slides = [
-  {
-    n: '01',
-    title: 'Live occupancy before arrival',
-    body: 'Drivers see availability by destination, deck, and open spaces before they commit to the trip.'
-  },
-  {
-    n: '02',
-    title: 'Camera-to-space intelligence',
-    body: 'IRIS maps existing cameras to stall geometry, confidence, and live inventory.'
-  },
-  {
-    n: '03',
-    title: 'Exact in-lot guidance',
-    body: 'Operators and drivers share one reliable state for spot assignment, rerouting, and rules.'
-  }
+const scenes = [
+  { label: 'Brand', title: 'Sightline.', kind: 'intro' },
+  { label: 'IRIS AI', title: 'IRIS.', kind: 'engine' },
+  { label: 'Location', title: 'Check before you drive.', kind: 'location' },
+  { label: 'Availability', title: 'See every deck nearby.', kind: 'nearby' },
+  { label: 'Assignment', title: 'Straight to the open spot.', kind: 'route' },
+  { label: 'Reroute', title: 'Next-nearest, automatically.', kind: 'reroute' },
+  { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' }
+];
+
+const storyCards = [
+  ['01', 'Live occupancy before arrival', 'Drivers see availability by destination, deck, and open spaces before they commit to the trip.'],
+  ['02', 'Camera-to-space intelligence', 'IRIS maps existing security cameras to stall geometry, confidence, and live inventory.'],
+  ['03', 'Exact in-lot guidance', 'Operators and drivers share one real-time state for spot assignment, rerouting, and rules.']
 ];
 
 export function renderAuth(state) {
+  const activeIndex = Math.max(0, Math.min(scenes.length - 1, Number(state.sceneIndex || 0)));
+  const progress = Math.round(((activeIndex + 1) / scenes.length) * 100);
+  const activeScene = scenes[activeIndex];
   const isRegister = state.authMode === 'register';
+
   return `
-    <main class="landing">
-      <header class="landing-header">
-        ${brand()}
-        <button class="button secondary" data-auth-mode="${isRegister ? 'login' : 'register'}">
-          ${isRegister ? 'Log in' : 'Create account'}
-        </button>
-      </header>
-      <section class="landing-grid">
-        <div class="hero-panel">
-          <div>${brand()}</div>
-          <h1>Sightline<span>.</span></h1>
-          <p class="hero-copy">Minimal parking intelligence with registration, persistence, and operational control that operators can trust.</p>
-          <div class="hero-actions">
-            <button class="button" data-auth-mode="register">Create workspace</button>
-            <button class="button secondary" data-auth-mode="login">Log in</button>
-          </div>
-          <div class="slide-rail">
-            ${slides.map((slide, index) => `
-              <article class="slide-card ${index === 0 ? 'active' : ''}">
-                <span>${slide.n}</span>
-                <strong>${escapeHtml(slide.title)}</strong>
-                <p>${escapeHtml(slide.body)}</p>
-              </article>
-            `).join('')}
-          </div>
+    <main class="story-shell">
+      <div class="story-stage" aria-label="Sightline product slideshow">
+        ${scenes.map((scene, index) => `
+          <section class="story-scene ${index === activeIndex ? 'active' : ''}" aria-hidden="${index === activeIndex ? 'false' : 'true'}">
+            ${renderScene(scene, index)}
+          </section>
+        `).join('')}
+      </div>
+
+      <nav class="story-side-nav" aria-label="Slideshow navigation">
+        ${scenes.map((scene, index) => `
+          <button class="${index === activeIndex ? 'active' : ''}" type="button" data-scene-index="${index}" aria-label="Go to ${escapeHtml(scene.label)}"></button>
+        `).join('')}
+      </nav>
+
+      <div class="story-progress" aria-label="Product demo progress">
+        <span>${escapeHtml(activeScene.label)}</span>
+        <div class="story-progress-track" aria-hidden="true"><i style="width: ${progress}%"></i></div>
+        <button type="button" data-launch-platform>Launch platform</button>
+      </div>
+
+      <button class="story-next" type="button" data-next-scene aria-label="Go to next section">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 24 L32 40 L46 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+
+      <aside class="platform-auth-panel ${state.authVisible ? 'open' : ''}" aria-hidden="${state.authVisible ? 'false' : 'true'}">
+        <div class="auth-panel-head">
+          ${brand()}
+          <button class="icon-button" type="button" data-close-auth aria-label="Close platform access">x</button>
         </div>
-        <aside class="auth-panel">
-          <h2>${isRegister ? 'Create your workspace' : 'Welcome back'}</h2>
-          <p>${isRegister ? 'Accounts are stored in SQLite with persistent sessions.' : 'Log back into your persisted IRIS workspace.'}</p>
-          <div class="auth-tabs">
-            <button class="auth-tab ${isRegister ? 'active' : ''}" data-auth-mode="register">Register</button>
-            <button class="auth-tab ${!isRegister ? 'active' : ''}" data-auth-mode="login">Login</button>
-          </div>
-          ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ''}
-          ${state.notice ? `<div class="notice">${escapeHtml(state.notice)}</div>` : ''}
-          ${isRegister ? registerForm() : loginForm()}
-        </aside>
-      </section>
+        <h2>${isRegister ? 'Create your workspace' : 'Welcome back'}</h2>
+        <p>${isRegister ? 'Accounts are stored in SQLite with persistent sessions.' : 'Log back into your persisted IRIS workspace.'}</p>
+        <div class="auth-tabs">
+          <button class="auth-tab ${isRegister ? 'active' : ''}" data-auth-mode="register">Register</button>
+          <button class="auth-tab ${!isRegister ? 'active' : ''}" data-auth-mode="login">Login</button>
+        </div>
+        ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ''}
+        ${state.notice ? `<div class="notice">${escapeHtml(state.notice)}</div>` : ''}
+        ${isRegister ? registerForm() : loginForm()}
+      </aside>
     </main>
+  `;
+}
+
+function renderScene(scene, index) {
+  if (scene.kind === 'intro') return introScene();
+  if (scene.kind === 'engine') return engineScene();
+  if (scene.kind === 'location') return phoneScene('Location awareness', scene.title, 'Enter any address. See live occupancy before you leave the house. Percentage, color, and open spaces stay in sync.', locationPhone());
+  if (scene.kind === 'nearby') return phoneScene('Lot awareness', scene.title, 'Sightline shows parking decks around you live. Color and percent tell you instantly whether a lot is open, filling, or full.', nearbyPhone());
+  if (scene.kind === 'route') return phoneScene('Driver 1 - inside the lot', scene.title, 'Once inside a Sightline-enabled lot, cameras know exactly which spots are open and route the driver there.', routePhone('P7', false));
+  if (scene.kind === 'reroute') return phoneScene('Driver 2 - behind them', scene.title, 'The moment P7 is taken, Sightline reroutes the next driver to P3. No conflict. No circling.', routePhone('P3', true));
+  return operatorScene(index);
+}
+
+function introScene() {
+  return `
+    <div class="title-wrap">
+      <div class="hero-copy">
+        <div class="wordmark">Sightline<span>.</span></div>
+        <div class="tagline">Parking intelligence that moves drivers and operators in sync.</div>
+        <div class="hero-actions">
+          <button class="demo-launch" type="button" data-launch-platform>Launch platform</button>
+          <button class="demo-launch secondary" type="button" data-next-story>View product story</button>
+        </div>
+      </div>
+      <div class="slide-preview-rail" aria-label="Sightline product story preview">
+        ${storyCards.map(([n, title, body], index) => `
+          <article class="story-card ${index === 0 ? 'is-current' : ''}">
+            <span>${n}</span>
+            <strong>${escapeHtml(title)}</strong>
+            <p>${escapeHtml(body)}</p>
+          </article>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function engineScene() {
+  return `
+    <div class="engine-wrap">
+      <div class="engine-eyebrow">Powered by</div>
+      <div class="engine-name">IRIS<span>.</span></div>
+      <div class="engine-expand">INFINITE REAL-TIME INTELLIGENCE SYSTEM</div>
+      <div class="engine-desc">The AI engine behind Sightline. IRIS turns parking cameras into live inventory, assignment, and rerouting intelligence.</div>
+      <div class="engine-pillars">
+        <div class="pillar"><div class="pn">01</div><div class="ph">Sees</div><div class="ps">Every camera feed</div></div>
+        <div class="pillar"><div class="pn">02</div><div class="ph">Learns</div><div class="ps">Lot geometry</div></div>
+        <div class="pillar"><div class="pn">03</div><div class="ph">Tells</div><div class="ps">Drivers and operators</div></div>
+      </div>
+    </div>
+  `;
+}
+
+function phoneScene(eyebrow, title, body, phoneHtml) {
+  return `
+    <div class="two-col">
+      <div class="side-label">
+        <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(body)}</p>
+        <div class="caption">Sightline product story</div>
+      </div>
+      ${phoneHtml}
+    </div>
+  `;
+}
+
+function phoneFrame(content) {
+  return `
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar">
+          <div>9:41</div>
+          <div class="status-icons"><div class="bars"><div></div><div></div><div></div><div></div></div><div class="battery"><div class="battery-fill"></div></div></div>
+        </div>
+        ${content}
+      </div>
+    </div>
+  `;
+}
+
+function locationPhone() {
+  return phoneFrame(`
+    <div class="app-header"><div class="brand">Sightline</div><div class="h">Check a destination</div></div>
+    <div class="search-input"><span>400 S Tryon St, Charlotte</span><span class="caret"></span></div>
+    <div class="location-card on">
+      <div class="name">Bank of America Tower</div>
+      <div class="addr">400 S Tryon St - Uptown Charlotte</div>
+      <div class="occ-row">
+        <div><div class="occ-label">Occupancy</div><div class="big-occ full"><span class="pct">87</span><span class="unit">%</span></div></div>
+        <div class="open-count"><div class="occ-label">Open spots</div><strong>13</strong></div>
+      </div>
+      <div class="occ-bar"><div class="occ-fill on"></div></div>
+      <div class="live-chip"><div class="dot"></div>LIVE - UPDATED 0.4s AGO</div>
+    </div>
+  `);
+}
+
+function nearbyPhone() {
+  const lots = [
+    ['7th Street Deck', '0.2 mi - 400 spots', '94% - Full', 'full'],
+    ['Parking Deck A', '0.4 mi - 200 spots', '34% - Open', 'open'],
+    ['Stonewall Garage', '0.5 mi - 280 spots', '71% - Filling', 'filling'],
+    ['College St Lot', '0.7 mi - 120 spots', '22% - Open', 'open']
+  ];
+
+  return phoneFrame(`
+    <div class="app-header"><div class="brand">Sightline</div><div class="h">Nearby decks</div></div>
+    <div class="nearby-list">
+      ${lots.map(([name, detail, status, tone]) => `
+        <div class="nearby-card on">
+          <div class="info"><div class="n">${escapeHtml(name)}</div><div class="d">${escapeHtml(detail)}</div></div>
+          <div class="phone-pill ${tone}">${escapeHtml(status)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+
+function routePhone(spot, rerouted) {
+  const targetClass = spot === 'P3' ? 'target-green' : 'target';
+  return phoneFrame(`
+    <div class="lot-view">
+      ${rerouted ? '<div class="reroute-banner"><div class="icon"></div><div>P7 just taken - rerouting to P3</div></div>' : ''}
+      <div class="inlot-hud">
+        <div class="arrow">➜</div>
+        <div class="text"><div class="dist">Head to <span>${spot}</span></div><div class="instr">Row 1 - 60 ft ahead</div></div>
+      </div>
+      <div class="lot-diagram">
+        <div class="lot-title-chip"><div class="dot"></div><div class="l">PARKING DECK A - LEVEL 2</div></div>
+        <div class="lot-grid">
+          ${['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12'].map((item) => `
+            <div class="lot-spot ${item === spot ? targetClass : item === 'P3' || item === 'P9' ? 'open' : 'taken'}">${item}</div>
+          `).join('')}
+          <svg class="route-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path class="route-path halo" d="${spot === 'P3' ? 'M 50 92 L 50 60 L 24 60 L 24 21' : 'M 50 92 L 50 60 L 86 60 L 86 21'}"></path>
+            <path class="route-path main ${spot === 'P3' ? 'green' : ''}" d="${spot === 'P3' ? 'M 50 92 L 50 60 L 24 60 L 24 21' : 'M 50 92 L 50 60 L 86 60 L 86 21'}"></path>
+          </svg>
+          <div class="driver-dot"></div>
+        </div>
+      </div>
+      <div class="spot-info-card"><div><strong>Spot ${spot}</strong><span>Level 2 - reserved for you</span></div><b>60 ft</b></div>
+    </div>
+  `);
+}
+
+function operatorScene() {
+  return `
+    <div class="dashboard-demo">
+      <div class="dash-header">
+        <div><div class="eyebrow">Operator view</div><h2>Every lot. One dashboard.</h2><p>Real-time occupancy. Historical trends. Revenue at a glance.</p></div>
+        <div class="dash-live"><div class="dot"></div>LIVE - UPDATED 0.4s AGO</div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi"><span>Revenue today</span><strong>$8,200</strong><em>Up 12%</em></div>
+        <div class="kpi"><span>Occupancy</span><strong>72%</strong><em>Up 4%</em></div>
+        <div class="kpi"><span>Cars today</span><strong>1,800</strong><em>Up 218</em></div>
+        <div class="kpi"><span>Avg stay</span><strong>2.4h</strong><em>Down 0.2h</em></div>
+      </div>
+      <div class="bars-chart">${[15, 22, 38, 52, 61, 68, 74, 82, 78, 65, 58, 72, 88, 92, 85].map((h) => `<div><span style="height:${h}%"></span></div>`).join('')}</div>
+      <button class="demo-launch" type="button" data-launch-platform>Launch Sightline</button>
+    </div>
   `;
 }
 
@@ -82,17 +248,11 @@ function registerForm() {
         <label>Account type</label>
         <div class="role-grid">
           <label class="choice">
-            <span class="choice-copy">
-              <strong>Provider</strong>
-              <span>Operate facilities and cameras</span>
-            </span>
+            <span class="choice-copy"><strong>Provider</strong><span>Operate facilities and cameras</span></span>
             <input type="radio" name="role" value="provider" checked>
           </label>
           <label class="choice">
-            <span class="choice-copy">
-              <strong>Driver</strong>
-              <span>Use guidance and availability</span>
-            </span>
+            <span class="choice-copy"><strong>Driver</strong><span>Use guidance and availability</span></span>
             <input type="radio" name="role" value="driver">
           </label>
         </div>

@@ -10,6 +10,8 @@ const state = {
   workspace: null,
   view: 'overview',
   authMode: 'register',
+  authVisible: false,
+  sceneIndex: 0,
   error: '',
   notice: ''
 };
@@ -51,7 +53,30 @@ async function initialize() {
 app.addEventListener('click', async (event) => {
   const authMode = event.target.closest('[data-auth-mode]')?.dataset.authMode;
   if (authMode) {
-    setState({ authMode, error: '', notice: '' });
+    setState({ authMode, authVisible: true, error: '', notice: '' });
+    return;
+  }
+
+  const launchAuth = event.target.closest('[data-launch-platform]');
+  if (launchAuth) {
+    setState({ authVisible: true, authMode: 'login', error: '', notice: '' });
+    return;
+  }
+
+  const closeAuth = event.target.closest('[data-close-auth]');
+  if (closeAuth) {
+    setState({ authVisible: false, error: '', notice: '' });
+    return;
+  }
+
+  const sceneButton = event.target.closest('[data-scene-index]');
+  if (sceneButton) {
+    setState({ sceneIndex: Number(sceneButton.dataset.sceneIndex) || 0 });
+    return;
+  }
+
+  if (event.target.closest('[data-next-story], [data-next-scene]')) {
+    setState({ sceneIndex: (state.sceneIndex + 1) % 7 });
     return;
   }
 
@@ -68,7 +93,7 @@ app.addEventListener('click', async (event) => {
   try {
     if (action === 'logout') {
       await api.logout();
-      setState({ user: null, workspace: null, authMode: 'login', notice: 'Logged out.', view: 'overview' });
+      setState({ user: null, workspace: null, authMode: 'login', authVisible: false, notice: 'Logged out.', view: 'overview' });
     }
     if (action === 'refresh') await loadWorkspace();
     if (action === 'scan') {
@@ -94,12 +119,12 @@ app.addEventListener('submit', async (event) => {
     if (type === 'register') {
       const payload = formData(form);
       const { user, workspace } = await api.register(payload);
-      setState({ user, workspace, error: '', notice: '', view: 'overview' });
+      setState({ user, workspace, authVisible: false, error: '', notice: '', view: 'overview' });
     }
 
     if (type === 'login') {
       const { user, workspace } = await api.login(formData(form));
-      setState({ user, workspace, error: '', notice: '', view: 'overview' });
+      setState({ user, workspace, authVisible: false, error: '', notice: '', view: 'overview' });
     }
 
     if (type === 'facility') {
