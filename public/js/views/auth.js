@@ -10,16 +10,8 @@ const scenes = [
   { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' }
 ];
 
-const storyCards = [
-  ['01', 'Live occupancy before arrival', 'Drivers see availability by destination, deck, and open spaces before they commit to the trip.'],
-  ['02', 'Camera-to-space intelligence', 'IRIS maps existing security cameras to stall geometry, confidence, and live inventory.'],
-  ['03', 'Exact in-lot guidance', 'Operators and drivers share one real-time state for spot assignment, rerouting, and rules.']
-];
-
 export function renderAuth(state) {
   const activeIndex = Math.max(0, Math.min(scenes.length - 1, Number(state.sceneIndex || 0)));
-  const progress = Math.round(((activeIndex + 1) / scenes.length) * 100);
-  const activeScene = scenes[activeIndex];
   const isRegister = state.authMode === 'register';
 
   return `
@@ -37,12 +29,6 @@ export function renderAuth(state) {
           <button class="${index === activeIndex ? 'active' : ''}" type="button" data-scene-index="${index}" aria-label="Go to ${escapeHtml(scene.label)}"></button>
         `).join('')}
       </nav>
-
-      <div class="story-progress" aria-label="Product demo progress">
-        <span>${escapeHtml(activeScene.label)}</span>
-        <div class="story-progress-track" aria-hidden="true"><i style="width: ${progress}%"></i></div>
-        <button type="button" data-launch-platform>Launch platform</button>
-      </div>
 
       <button class="story-next" type="button" data-next-scene aria-label="Go to next section">
         <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 24 L32 40 L46 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -80,22 +66,10 @@ function renderScene(scene, index) {
 function introScene() {
   return `
     <div class="title-wrap">
-      <div class="hero-copy">
+      <div class="original-intro">
+        <div class="product-demo-label">Sightline · Product demo</div>
         <div class="wordmark">Sightline<span>.</span></div>
-        <div class="tagline">Parking intelligence that moves drivers and operators in sync.</div>
-        <div class="hero-actions">
-          <button class="demo-launch" type="button" data-launch-platform>Launch platform</button>
-          <button class="demo-launch secondary" type="button" data-next-story>View product story</button>
-        </div>
-      </div>
-      <div class="slide-preview-rail" aria-label="Sightline product story preview">
-        ${storyCards.map(([n, title, body], index) => `
-          <article class="story-card ${index === 0 ? 'is-current' : ''}">
-            <span>${n}</span>
-            <strong>${escapeHtml(title)}</strong>
-            <p>${escapeHtml(body)}</p>
-          </article>
-        `).join('')}
+        <div class="tagline">Never circle again</div>
       </div>
     </div>
   `;

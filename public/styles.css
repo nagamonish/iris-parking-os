@@ -136,14 +136,17 @@ a {
 }
 
 .story-shell {
+  --story-bg: #070708;
+  --story-fg: #f5f1f7;
+  --story-muted: rgba(245, 241, 247, 0.42);
+  --story-soft: rgba(245, 241, 247, 0.16);
+  --story-dot: rgba(245, 241, 247, 0.14);
+  --story-accent: #b57eff;
   min-height: 100vh;
   position: relative;
   overflow: hidden;
-  color: #f7f2ff;
-  background:
-    radial-gradient(circle at 50% 20%, rgba(181, 126, 255, 0.2), transparent 34%),
-    radial-gradient(circle at 80% 76%, rgba(85, 214, 223, 0.16), transparent 30%),
-    #07070c;
+  color: var(--story-fg);
+  background: var(--story-bg);
 }
 
 .story-stage {
@@ -167,12 +170,7 @@ a {
 }
 
 .story-scene::before {
-  content: "";
-  position: absolute;
-  inset: 18% 12%;
-  background: radial-gradient(circle at center, rgba(181, 126, 255, 0.22), rgba(181, 126, 255, 0) 65%);
-  pointer-events: none;
-  z-index: -1;
+  display: none;
 }
 
 .story-scene.active {
@@ -188,14 +186,29 @@ a {
   text-align: center;
   display: grid;
   justify-items: center;
-  gap: 34px;
-  transform: translateY(-2vh);
+  gap: 0;
+  transform: translateY(-1vh);
+}
+
+.original-intro {
+  display: grid;
+  justify-items: center;
+}
+
+.product-demo-label {
+  margin-bottom: 18px;
+  color: var(--story-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.34em;
+  text-transform: none;
 }
 
 .wordmark,
 .engine-name {
   font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  font-size: clamp(68px, 10vw, 132px);
+  color: var(--story-fg);
+  font-size: clamp(54px, 5vw, 84px);
   font-weight: 500;
   letter-spacing: -0.04em;
   line-height: 0.94;
@@ -203,13 +216,15 @@ a {
 
 .wordmark span,
 .engine-name span {
-  color: #b57eff;
+  color: var(--story-accent);
 }
 
 .tagline {
-  margin-top: 16px;
-  font-size: clamp(16px, 1.7vw, 24px);
-  color: rgba(247, 242, 255, 0.68);
+  margin-top: 8px;
+  color: var(--story-muted);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .hero-actions {
@@ -864,23 +879,23 @@ a {
   position: fixed;
   z-index: 12;
   top: 50%;
-  right: 24px;
+  left: 66px;
   display: grid;
   gap: 12px;
   transform: translateY(-50%);
 }
 
 .story-side-nav button {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: rgba(247, 242, 255, 0.28);
+  background: var(--story-dot);
   cursor: pointer;
 }
 
 .story-side-nav button.active {
-  background: #f7f2ff;
-  box-shadow: 0 0 0 6px rgba(247, 242, 255, 0.1);
+  background: var(--story-soft);
+  box-shadow: none;
 }
 
 .story-progress {
@@ -923,22 +938,22 @@ a {
 .story-next {
   position: fixed;
   z-index: 11;
-  bottom: 82px;
+  bottom: 13.5vh;
   left: 50%;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
   border-radius: 999px;
-  color: #f7f2ff;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--story-soft);
+  background: transparent;
   transform: translateX(-50%);
   cursor: pointer;
 }
 
 .story-next svg {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
 }
 
 .platform-auth-panel {
@@ -994,6 +1009,16 @@ a {
 .platform-auth-panel > p {
   margin: 8px 0 22px;
   color: var(--ink-soft);
+}
+
+@media (prefers-color-scheme: light) {
+  .story-shell {
+    --story-bg: #ffffff;
+    --story-fg: #050506;
+    --story-muted: rgba(5, 5, 6, 0.26);
+    --story-soft: rgba(5, 5, 6, 0.12);
+    --story-dot: rgba(5, 5, 6, 0.08);
+  }
 }
 
 .landing-header {
@@ -1565,17 +1590,19 @@ a {
 
   .title-wrap {
     width: 100%;
-    gap: 24px;
+    min-height: calc(100dvh - 146px);
+    align-content: center;
+    gap: 0;
     transform: none;
   }
 
   .wordmark,
   .engine-name {
-    font-size: clamp(58px, 18vw, 76px);
+    font-size: clamp(54px, 17vw, 72px);
   }
 
   .tagline {
-    font-size: 17px;
+    font-size: 12px;
   }
 
   .hero-actions {
