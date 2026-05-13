@@ -10,6 +10,8 @@ const scenes = [
   { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' }
 ];
 
+export const STORY_SCENE_COUNT = scenes.length;
+
 export function renderAuth(state) {
   const activeIndex = Math.max(0, Math.min(scenes.length - 1, Number(state.sceneIndex || 0)));
   const isRegister = state.authMode === 'register';
