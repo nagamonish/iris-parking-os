@@ -20,7 +20,7 @@ export function renderAuth(state) {
     <main class="story-shell">
       <div class="story-stage" aria-label="Sightline product slideshow">
         ${scenes.map((scene, index) => `
-          <section class="story-scene ${index === activeIndex ? 'active' : ''}" aria-hidden="${index === activeIndex ? 'false' : 'true'}">
+          <section class="story-scene ${index === activeIndex ? 'active' : ''}" data-scene-kind="${scene.kind}" aria-hidden="${index === activeIndex ? 'false' : 'true'}">
             ${renderScene(scene, index)}
           </section>
         `).join('')}
@@ -80,14 +80,14 @@ function introScene() {
 function engineScene() {
   return `
     <div class="engine-wrap">
-      <div class="engine-eyebrow">Powered by</div>
-      <div class="engine-name">IRIS<span>.</span></div>
-      <div class="engine-expand">INFINITE REAL-TIME INTELLIGENCE SYSTEM</div>
-      <div class="engine-desc">The AI engine behind Sightline. IRIS turns parking cameras into live inventory, assignment, and rerouting intelligence.</div>
+      <div class="engine-eyebrow" id="engineEyebrow">Powered by</div>
+      <div class="engine-name" id="engineName">IRIS<span>.</span></div>
+      <div class="engine-expand" id="engineExpand">INFINITE REAL-TIME INTELLIGENCE SYSTEM</div>
+      <div class="engine-desc" id="engineDesc">The AI engine behind Sightline. IRIS turns parking cameras into live inventory, assignment, and rerouting intelligence.</div>
       <div class="engine-pillars">
-        <div class="pillar"><div class="pn">01</div><div class="ph">Sees</div><div class="ps">Every camera feed</div></div>
-        <div class="pillar"><div class="pn">02</div><div class="ph">Learns</div><div class="ps">Lot geometry</div></div>
-        <div class="pillar"><div class="pn">03</div><div class="ph">Tells</div><div class="ps">Drivers and operators</div></div>
+        <div class="pillar" id="p1"><div class="pn">01</div><div class="ph">Sees</div><div class="ps">Every camera feed</div></div>
+        <div class="pillar" id="p2"><div class="pn">02</div><div class="ph">Learns</div><div class="ps">Lot geometry</div></div>
+        <div class="pillar" id="p3"><div class="pn">03</div><div class="ph">Tells</div><div class="ps">Drivers and operators</div></div>
       </div>
     </div>
   `;
@@ -124,15 +124,15 @@ function phoneFrame(content) {
 function locationPhone() {
   return phoneFrame(`
     <div class="app-header"><div class="brand">Sightline</div><div class="h">Check a destination</div></div>
-    <div class="search-input"><span>400 S Tryon St, Charlotte</span><span class="caret"></span></div>
-    <div class="location-card on">
+    <div class="search-input"><span class="typed-address" id="typedAddr">400 S Tryon St, Charlotte</span><span class="caret"></span></div>
+    <div class="location-card" id="locCard">
       <div class="name">Bank of America Tower</div>
       <div class="addr">400 S Tryon St - Uptown Charlotte</div>
       <div class="occ-row">
         <div><div class="occ-label">Occupancy</div><div class="big-occ full"><span class="pct">87</span><span class="unit">%</span></div></div>
         <div class="open-count"><div class="occ-label">Open spots</div><strong>13</strong></div>
       </div>
-      <div class="occ-bar"><div class="occ-fill on"></div></div>
+      <div class="occ-bar"><div class="occ-fill" id="occFill"></div></div>
       <div class="live-chip"><div class="dot"></div>LIVE - UPDATED 0.4s AGO</div>
     </div>
   `);
@@ -149,8 +149,8 @@ function nearbyPhone() {
   return phoneFrame(`
     <div class="app-header"><div class="brand">Sightline</div><div class="h">Nearby decks</div></div>
     <div class="nearby-list">
-      ${lots.map(([name, detail, status, tone]) => `
-        <div class="nearby-card on">
+      ${lots.map(([name, detail, status, tone], index) => `
+        <div class="nearby-card" id="nearby${index + 1}">
           <div class="info"><div class="n">${escapeHtml(name)}</div><div class="d">${escapeHtml(detail)}</div></div>
           <div class="phone-pill ${tone}">${escapeHtml(status)}</div>
         </div>
@@ -160,28 +160,34 @@ function nearbyPhone() {
 }
 
 function routePhone(spot, rerouted) {
-  const targetClass = spot === 'P3' ? 'target-green' : 'target';
+  const activeSpot = rerouted ? 'P7' : spot;
+  const pathToP7 = 'M 50 92 L 50 60 L 86 60 L 86 21';
+  const pathToP3 = 'M 50 92 L 50 60 L 24 60 L 24 21';
+  const initialPath = activeSpot === 'P3' ? pathToP3 : pathToP7;
+  const targetClass = activeSpot === 'P3' ? 'target-green' : 'target';
+  const prefix = rerouted ? '2' : '1';
   return phoneFrame(`
     <div class="lot-view">
-      ${rerouted ? '<div class="reroute-banner"><div class="icon"></div><div>P7 just taken - rerouting to P3</div></div>' : ''}
-      <div class="inlot-hud">
+      ${rerouted ? '<div class="reroute-banner" id="rerouteBanner"><div class="icon"></div><div>P7 just taken - rerouting to P3</div></div>' : ''}
+      <div class="inlot-hud" id="hud${prefix}">
         <div class="arrow">➜</div>
-        <div class="text"><div class="dist">Head to <span>${spot}</span></div><div class="instr">Row 1 - 60 ft ahead</div></div>
+        <div class="text"><div class="dist" id="hud${prefix}Text">Head to <span>${activeSpot}</span></div><div class="instr">Row 1 - 60 ft ahead</div></div>
       </div>
       <div class="lot-diagram">
         <div class="lot-title-chip"><div class="dot"></div><div class="l">PARKING DECK A - LEVEL 2</div></div>
         <div class="lot-grid">
           ${['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12'].map((item) => `
-            <div class="lot-spot ${item === spot ? targetClass : item === 'P3' || item === 'P9' ? 'open' : 'taken'}">${item}</div>
+            <div class="lot-spot ${item === activeSpot ? targetClass : item === 'P3' || item === 'P9' ? 'open' : 'taken'}" ${rerouted && item === 'P3' ? 'id="sp3b"' : ''} ${rerouted && item === 'P7' ? 'id="sp7b"' : ''}>${item}</div>
           `).join('')}
           <svg class="route-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path class="route-path halo" d="${spot === 'P3' ? 'M 50 92 L 50 60 L 24 60 L 24 21' : 'M 50 92 L 50 60 L 86 60 L 86 21'}"></path>
-            <path class="route-path main ${spot === 'P3' ? 'green' : ''}" d="${spot === 'P3' ? 'M 50 92 L 50 60 L 24 60 L 24 21' : 'M 50 92 L 50 60 L 86 60 L 86 21'}"></path>
+            <path class="route-path halo" id="routeHalo${prefix}" d="${initialPath}"></path>
+            <path class="route-path main ${activeSpot === 'P3' ? 'green' : ''}" id="routeMain${prefix}" d="${initialPath}"></path>
+            <path class="route-flow ${activeSpot === 'P3' ? 'green' : ''}" id="routeFlow${prefix}" d="${initialPath}"></path>
           </svg>
-          <div class="driver-dot"></div>
+          <div class="driver-dot" id="driver${prefix}"></div>
         </div>
       </div>
-      <div class="spot-info-card"><div><strong>Spot ${spot}</strong><span>Level 2 - reserved for you</span></div><b>60 ft</b></div>
+      <div class="spot-info-card" id="spotCard${prefix}"><div><strong id="spotLabel">Spot ${activeSpot}</strong><span id="spotSub">Level 2 - reserved for you</span></div><b id="spotDist">60 ft</b></div>
     </div>
   `);
 }
@@ -199,7 +205,7 @@ function operatorScene() {
         <div class="kpi"><span>Cars today</span><strong>1,800</strong><em>Up 218</em></div>
         <div class="kpi"><span>Avg stay</span><strong>2.4h</strong><em>Down 0.2h</em></div>
       </div>
-      <div class="bars-chart">${[15, 22, 38, 52, 61, 68, 74, 82, 78, 65, 58, 72, 88, 92, 85].map((h) => `<div><span style="height:${h}%"></span></div>`).join('')}</div>
+      <div class="bars-chart" id="barsChart">${[15, 22, 38, 52, 61, 68, 74, 82, 78, 65, 58, 72, 88, 92, 85].map((h) => `<div><span style="height:${h}%"></span></div>`).join('')}</div>
       <button class="demo-launch" type="button" data-launch-platform>Launch Sightline</button>
     </div>
   `;

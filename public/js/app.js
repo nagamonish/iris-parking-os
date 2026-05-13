@@ -5,6 +5,11 @@ import { renderShell } from './views/dashboard.js';
 const app = document.getElementById('app');
 const SCENE_SCROLL_THRESHOLD = 72;
 const SCENE_TRANSITION_LOCK_MS = 620;
+const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator'];
+const ROUTE_PATHS = {
+  p7: 'M 50 92 L 50 60 L 86 60 L 86 21',
+  p3: 'M 50 92 L 50 60 L 24 60 L 24 21'
+};
 
 const state = {
   loading: true,
@@ -20,6 +25,7 @@ const state = {
 
 let wheelDelta = 0;
 let sceneLockUntil = 0;
+let sceneEffectTimers = [];
 let touchStartY = null;
 let touchStartX = null;
 let touchStartTarget = null;
@@ -38,6 +44,8 @@ function render() {
   app.innerHTML = state.user && state.workspace
     ? renderShell(state)
     : renderAuth(state);
+
+  queueMicrotask(scheduleStorySceneEffects);
 }
 
 function formData(form) {
@@ -79,6 +87,138 @@ function stepScene(direction) {
   return changed;
 }
 
+function clearSceneEffects() {
+  sceneEffectTimers.forEach((timer) => window.clearTimeout(timer));
+  sceneEffectTimers = [];
+}
+
+function after(delay, callback) {
+  const timer = window.setTimeout(callback, delay);
+  sceneEffectTimers.push(timer);
+}
+
+function activeStoryScene() {
+  return app.querySelector('.story-scene.active');
+}
+
+function sceneElement(selector) {
+  return activeStoryScene()?.querySelector(selector) || null;
+}
+
+function addOn(selector, delay = 0) {
+  after(delay, () => sceneElement(selector)?.classList.add('on'));
+}
+
+function setSceneText(selector, html, delay = 0) {
+  after(delay, () => {
+    const element = sceneElement(selector);
+    if (element) element.innerHTML = html;
+  });
+}
+
+function setRoutePath(prefix, target, delay = 0) {
+  after(delay, () => {
+    const path = ROUTE_PATHS[target];
+    const scene = activeStoryScene();
+    const main = scene?.querySelector(`#routeMain${prefix}`);
+    const halo = scene?.querySelector(`#routeHalo${prefix}`);
+    const flow = scene?.querySelector(`#routeFlow${prefix}`);
+    main?.classList.remove('on');
+    flow?.classList.remove('on');
+    [main, halo, flow].forEach((element) => {
+      if (element) element.setAttribute('d', path);
+    });
+    [main, flow].forEach((element) => {
+      if (element) element.classList.toggle('green', target === 'p3');
+    });
+    if (main) window.requestAnimationFrame(() => main.classList.add('on'));
+    if (flow) window.requestAnimationFrame(() => flow.classList.add('on'));
+  });
+}
+
+function moveDriver(prefix, left, top, delay = 0) {
+  after(delay, () => {
+    const driver = sceneElement(`#driver${prefix}`);
+    if (!driver) return;
+    driver.style.left = left;
+    driver.style.top = top;
+  });
+}
+
+function scheduleStorySceneEffects() {
+  clearSceneEffects();
+  if (!isStoryMode()) return;
+
+  const sceneKey = STORY_SCENE_KEYS[clampSceneIndex(state.sceneIndex)];
+
+  after(24, () => {
+    if (sceneKey === 'engine') {
+      addOn('#engineEyebrow', 60);
+      addOn('#engineName', 180);
+      addOn('#engineExpand', 340);
+      addOn('#engineDesc', 520);
+      ['#p1', '#p2', '#p3'].forEach((selector, index) => addOn(selector, 760 + index * 150));
+    }
+
+    if (sceneKey === 'location') {
+      addOn('#typedAddr', 120);
+      addOn('#locCard', 980);
+      addOn('#occFill', 1280);
+    }
+
+    if (sceneKey === 'nearby') {
+      ['#nearby1', '#nearby2', '#nearby3', '#nearby4'].forEach((selector, index) => addOn(selector, 140 + index * 170));
+    }
+
+    if (sceneKey === 'route') {
+      addOn('#hud1', 120);
+      addOn('#spotCard1', 260);
+      addOn('#routeMain1', 420);
+      addOn('#routeFlow1', 520);
+      addOn('#driver1', 540);
+      moveDriver('1', '49%', '88%', 560);
+      moveDriver('1', '49%', '58%', 980);
+      moveDriver('1', '84%', '58%', 1420);
+      moveDriver('1', '84%', '19%', 1860);
+    }
+
+    if (sceneKey === 'reroute') {
+      addOn('#hud2', 120);
+      addOn('#spotCard2', 240);
+      addOn('#routeMain2', 380);
+      addOn('#routeFlow2', 460);
+      addOn('#driver2', 480);
+      moveDriver('2', '49%', '88%', 500);
+      moveDriver('2', '49%', '58%', 900);
+      moveDriver('2', '70%', '58%', 1250);
+      addOn('#rerouteBanner', 1500);
+      after(1520, () => {
+        sceneElement('#sp7b')?.classList.remove('target');
+        sceneElement('#sp7b')?.classList.add('taken');
+        sceneElement('#sp3b')?.classList.remove('open');
+        sceneElement('#sp3b')?.classList.add('target-green');
+      });
+      setRoutePath('2', 'p3', 1560);
+      setSceneText('#hud2Text', 'Head to <span>P3</span>', 1560);
+      setSceneText('#spotLabel', 'Spot P3', 1560);
+      setSceneText('#spotDist', '90 ft', 1560);
+      moveDriver('2', '49%', '58%', 1720);
+      moveDriver('2', '23%', '58%', 2140);
+      moveDriver('2', '23%', '19%', 2560);
+    }
+
+    if (sceneKey === 'operator') {
+      app.querySelectorAll('.story-scene.active .kpi').forEach((card, index) => {
+        after(100 + index * 120, () => card.classList.add('on'));
+      });
+      app.querySelectorAll('.story-scene.active .bars-chart span').forEach((bar, index) => {
+        after(520 + index * 55, () => bar.classList.add('on'));
+      });
+      addOn('.demo-launch', 1250);
+    }
+  });
+}
+
 function isTypingTarget(target) {
   return Boolean(closestElement(target, 'input, textarea, select, [contenteditable="true"]'));
 }
@@ -86,6 +226,8 @@ function isTypingTarget(target) {
 function canScrollWithinActiveScene(target, direction) {
   const scene = closestElement(target, '.story-scene.active');
   if (!scene || scene.scrollHeight <= scene.clientHeight + 2) return false;
+  const overflowY = window.getComputedStyle(scene).overflowY;
+  if (overflowY !== 'auto' && overflowY !== 'scroll') return false;
   if (direction > 0) return scene.scrollTop + scene.clientHeight < scene.scrollHeight - 2;
   return scene.scrollTop > 2;
 }

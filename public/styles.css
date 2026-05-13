@@ -166,7 +166,7 @@ a {
   visibility: hidden;
   pointer-events: none;
   transform: translateY(20px) scale(0.985);
-  transition: opacity 0.5s ease, transform 0.5s ease, visibility 0s linear 0.5s;
+  transition: opacity 0.68s cubic-bezier(0.19, 1, 0.22, 1), transform 0.68s cubic-bezier(0.19, 1, 0.22, 1), visibility 0s linear 0.68s;
 }
 
 .story-scene::before {
@@ -179,6 +179,30 @@ a {
   pointer-events: auto;
   transform: translateY(0) scale(1);
   transition-delay: 0s;
+}
+
+.story-scene.active .product-demo-label {
+  animation: softRise 0.58s ease both 0.1s;
+}
+
+.story-scene.active .wordmark {
+  animation: softRise 0.72s ease both 0.22s;
+}
+
+.story-scene.active .tagline {
+  animation: softRise 0.6s ease both 0.44s;
+}
+
+@keyframes softRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .title-wrap {
@@ -304,6 +328,25 @@ a {
   text-align: center;
   display: grid;
   justify-items: center;
+}
+
+.engine-eyebrow,
+.engine-name,
+.engine-expand,
+.engine-desc,
+.pillar {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.58s ease, transform 0.58s ease;
+}
+
+.engine-eyebrow.on,
+.engine-name.on,
+.engine-expand.on,
+.engine-desc.on,
+.pillar.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .engine-expand {
@@ -508,6 +551,19 @@ a {
   font-size: 14px;
 }
 
+.typed-address {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+  transition: max-width 1.45s steps(30);
+}
+
+.typed-address.on {
+  max-width: 230px;
+}
+
 .caret {
   display: inline-block;
   width: 2px;
@@ -523,6 +579,14 @@ a {
   margin: 14px;
   padding: 16px 18px;
   border-radius: 14px;
+  opacity: 0;
+  transform: translateY(16px) scale(0.985);
+  transition: opacity 0.58s ease, transform 0.58s ease;
+}
+
+.location-card.on {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .location-card .name,
@@ -581,10 +645,15 @@ a {
 
 .occ-fill {
   display: block;
-  width: 87%;
+  width: 0;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #7a4bff, #b57eff);
+  transition: width 1.05s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.occ-fill.on {
+  width: 87%;
 }
 
 .live-chip,
@@ -620,6 +689,14 @@ a {
   justify-content: space-between;
   padding: 14px;
   border-radius: 12px;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.48s ease, transform 0.48s ease;
+}
+
+.nearby-card.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .phone-pill {
@@ -650,6 +727,14 @@ a {
   background: #c7ffd8;
   font-size: 13px;
   font-weight: 780;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.reroute-banner.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .inlot-hud {
@@ -658,6 +743,14 @@ a {
   align-items: center;
   padding: 12px;
   border-radius: 12px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.48s ease, transform 0.48s ease;
+}
+
+.inlot-hud.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .inlot-hud .arrow {
@@ -769,10 +862,43 @@ a {
 .route-path.main {
   stroke: #b57eff;
   stroke-width: 4;
+  stroke-dasharray: 180;
+  stroke-dashoffset: 180;
+  transition: stroke-dashoffset 1.15s ease, stroke 0.35s ease;
+}
+
+.route-path.main.on {
+  stroke-dashoffset: 0;
 }
 
 .route-path.main.green {
   stroke: #7dffad;
+}
+
+.route-flow {
+  fill: none;
+  stroke: #f7f2ff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 9;
+  opacity: 0;
+  animation: routePulse 1.05s linear infinite;
+  transition: opacity 0.35s ease, stroke 0.35s ease;
+}
+
+.route-flow.green {
+  stroke: #e7ffef;
+}
+
+.route-flow.on {
+  opacity: 0.72;
+}
+
+@keyframes routePulse {
+  to {
+    stroke-dashoffset: -40;
+  }
 }
 
 .driver-dot {
@@ -784,6 +910,14 @@ a {
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.16);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.75);
+  transition: top 0.75s cubic-bezier(0.2, 0.8, 0.2, 1), left 0.75s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease, transform 0.28s ease;
+}
+
+.driver-dot.on {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
 }
 
 .spot-info-card {
@@ -793,6 +927,14 @@ a {
   margin-top: 14px;
   padding: 14px;
   border-radius: 14px;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.48s ease, transform 0.48s ease;
+}
+
+.spot-info-card.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .spot-info-card strong,
@@ -834,6 +976,14 @@ a {
   border-radius: 16px;
   border: 1px solid rgba(247, 242, 255, 0.1);
   background: rgba(0, 0, 0, 0.16);
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.46s ease, transform 0.46s ease;
+}
+
+.kpi.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .kpi span,
@@ -873,6 +1023,24 @@ a {
   width: 100%;
   border-radius: 999px 999px 0 0;
   background: linear-gradient(180deg, #d8bdff, #b57eff);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.78s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.bars-chart span.on {
+  transform: scaleY(1);
+}
+
+.dashboard-demo .demo-launch {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.dashboard-demo .demo-launch.on {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .story-side-nav {
@@ -1578,9 +1746,9 @@ a {
   .story-scene {
     height: 100dvh;
     min-height: 100dvh;
-    align-items: flex-start;
-    padding: 26px 22px 120px;
-    overflow-y: auto;
+    align-items: center;
+    padding: 24px 20px 86px;
+    overflow: hidden;
     scrollbar-width: none;
   }
 
@@ -1625,7 +1793,7 @@ a {
   }
 
   .engine-wrap {
-    padding-top: 24px;
+    padding-top: 0;
   }
 
   .engine-expand {
@@ -1633,28 +1801,94 @@ a {
     line-height: 1.6;
   }
 
-  .engine-pillars,
-  .kpi-grid {
+  .engine-pillars {
     grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .pillar {
+    padding: 14px 16px;
+  }
+
+  .ph {
+    margin-top: 8px;
+    font-size: 24px;
+  }
+
+  .ps {
+    font-size: 13px;
   }
 
   .two-col {
     flex-direction: column;
-    gap: 24px;
+    gap: 18px;
+    justify-content: center;
   }
 
   .side-label {
     max-width: none;
+    text-align: center;
   }
 
   .side-label h2,
   .dashboard-demo h2 {
-    font-size: 35px;
+    font-size: 30px;
+  }
+
+  .side-label p,
+  .caption {
+    display: none;
   }
 
   .phone {
-    width: min(310px, 86vw);
-    height: 620px;
+    width: min(286px, 84vw);
+    height: 520px;
+    border-radius: 38px;
+  }
+
+  .phone::before {
+    width: 96px;
+    height: 24px;
+  }
+
+  .screen {
+    border-radius: 34px;
+  }
+
+  .app-header {
+    padding: 52px 18px 12px;
+  }
+
+  .app-header .h {
+    font-size: 19px;
+  }
+
+  .location-card {
+    padding: 14px;
+  }
+
+  .big-occ .pct {
+    font-size: 36px;
+  }
+
+  .lot-view {
+    padding-top: 54px;
+  }
+
+  .lot-grid {
+    gap: 6px;
+    min-height: 200px;
+  }
+
+  .lot-spot {
+    min-height: 36px;
+    border-radius: 8px;
+  }
+
+  .spot-info-card {
+    margin-top: 10px;
+    padding: 12px;
   }
 
   .dashboard-demo {
@@ -1665,8 +1899,26 @@ a {
     display: grid;
   }
 
+  .dashboard-demo p {
+    display: none;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .kpi {
+    padding: 12px;
+  }
+
+  .kpi strong {
+    font-size: 24px;
+  }
+
   .bars-chart {
-    height: 180px;
+    height: 150px;
     gap: 5px;
     padding: 14px;
   }
@@ -1687,7 +1939,7 @@ a {
   }
 
   .story-next {
-    bottom: 92px;
+    bottom: 28px;
   }
 
   .platform-auth-panel {
