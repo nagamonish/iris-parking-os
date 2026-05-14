@@ -30,7 +30,7 @@ function validateRegistration(body) {
   const name = String(body.name || '').trim();
   const email = normalizeEmail(body.email);
   const password = String(body.password || '');
-  const role = body.role === 'driver' ? 'driver' : 'provider';
+  const role = 'provider';
   const organizationName = String(body.organizationName || body.orgName || 'Crown City Parking Group').trim();
   const providerType = String(body.providerType || 'Commercial Parking Company').trim();
 
@@ -111,7 +111,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === 'POST' && url.pathname === '/api/facilities') {
-    if (user.role !== 'provider') return sendError(res, 403, 'Only provider accounts can add facilities.');
+    if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can add facilities.');
     addFacility(user.id, await readJson(req));
     return sendJson(res, 201, { workspace: getWorkspace(user.id) });
   }

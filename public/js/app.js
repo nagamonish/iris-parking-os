@@ -325,7 +325,7 @@ app.addEventListener('click', async (event) => {
     }
     if (action === 'reassign') {
       const { workspace } = await api.reassign();
-      setState({ workspace, notice: 'Driver assignment updated.', error: '' });
+      setState({ workspace, notice: 'Mobile app assignment synced.', error: '' });
     }
   } catch (error) {
     setState({ error: error.message, notice: '' });

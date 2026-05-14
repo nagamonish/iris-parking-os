@@ -8,7 +8,7 @@ const scenes = [
   { label: 'Assignment', title: 'Straight to the open spot.', kind: 'route' },
   { label: 'Reroute', title: 'Next-nearest, automatically.', kind: 'reroute' },
   { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' },
-  { label: 'Launch', title: 'One platform. Every driver. Everywhere.', kind: 'close' }
+  { label: 'Launch', title: 'One operator console. Every driver in motion.', kind: 'close' }
 ];
 
 export const STORY_SCENE_COUNT = scenes.length;
@@ -47,21 +47,21 @@ export function renderAuthPage(state) {
       <section class="auth-hero">
         <button class="auth-back" type="button" data-back-story aria-label="Back to product story">Back to demo</button>
         <div class="auth-hero-copy">
-          <div class="product-demo-label">Sightline · Platform access</div>
+          <div class="product-demo-label">Sightline · Operator access</div>
           <h1>${isRegister ? 'Create your operator workspace.' : 'Welcome back to Sightline.'}</h1>
-          <p>${isRegister ? 'Set up a persisted IRIS workspace with SQLite-backed accounts, sessions, and facility data.' : 'Log into your persisted workspace to manage facilities, cameras, occupancy, and assignments.'}</p>
+          <p>${isRegister ? 'Set up a persisted operator console for facilities, cameras, occupancy, and mobile driver guidance.' : 'Log into your operator workspace to manage facilities, cameras, occupancy, and mobile app assignments.'}</p>
         </div>
         <div class="auth-proof-grid" aria-label="Platform highlights">
           <div><span>SQLite</span><strong>Persistent sessions</strong></div>
-          <div><span>Live ops</span><strong>Facility dashboard</strong></div>
-          <div><span>IRIS</span><strong>Camera intelligence</strong></div>
+          <div><span>Web console</span><strong>Operator dashboard</strong></div>
+          <div><span>Mobile sync</span><strong>Driver app guidance</strong></div>
         </div>
       </section>
 
       <section class="auth-card" aria-labelledby="authTitle">
         ${brand()}
         <h2 id="authTitle">${isRegister ? 'Create account' : 'Log in'}</h2>
-        <p>${isRegister ? 'Register as an operator or driver to enter the platform.' : 'Use your saved account to continue.'}</p>
+        <p>${isRegister ? 'Register an operator account for the web console.' : 'Use your saved operator account to continue.'}</p>
         <div class="auth-tabs">
           <button class="auth-tab ${isRegister ? 'active' : ''}" data-auth-mode="register">Register</button>
           <button class="auth-tab ${!isRegister ? 'active' : ''}" data-auth-mode="login">Login</button>
@@ -79,8 +79,8 @@ function renderScene(scene, index) {
   if (scene.kind === 'engine') return engineScene();
   if (scene.kind === 'location') return phoneScene('Location awareness', scene.title, 'Enter any address. See live occupancy before you leave the house. Percentage, color, and open spaces stay in sync.', locationPhone());
   if (scene.kind === 'nearby') return phoneScene('Lot awareness', scene.title, 'Sightline shows parking decks around you live. Color and percent tell you instantly whether a lot is open, filling, or full.', nearbyPhone());
-  if (scene.kind === 'route') return phoneScene('Driver 1 - inside the lot', scene.title, 'Once inside a Sightline-enabled lot, cameras know exactly which spots are open and route the driver there.', routePhone('P7', false));
-  if (scene.kind === 'reroute') return phoneScene('Driver 2 - behind them', scene.title, 'The moment P7 is taken, Sightline reroutes the next driver to P3. No conflict. No circling.', routePhone('P3', true));
+  if (scene.kind === 'route') return phoneScene('Driver mobile app - inside the lot', scene.title, 'Once inside a Sightline-enabled lot, cameras know exactly which spots are open and the mobile app routes the driver there.', routePhone('P7', false));
+  if (scene.kind === 'reroute') return phoneScene('Driver mobile app - behind them', scene.title, 'The moment P7 is taken, Sightline reroutes the next mobile app assignment to P3. No conflict. No circling.', routePhone('P3', true));
   if (scene.kind === 'operator') return operatorScene(index);
   return closeScene();
 }
@@ -91,7 +91,7 @@ function introScene() {
       <div class="original-intro">
         <div class="product-demo-label">Sightline · Product demo</div>
         <div class="wordmark">Sightline<span>.</span></div>
-        <div class="tagline">Never circle again</div>
+        <div class="tagline">Operators on web. Drivers in app.</div>
       </div>
     </div>
   `;
@@ -103,11 +103,11 @@ function engineScene() {
       <div class="engine-eyebrow" id="engineEyebrow">Powered by</div>
       <div class="engine-name" id="engineName">IRIS<span>.</span></div>
       <div class="engine-expand" id="engineExpand">INFINITE REAL-TIME INTELLIGENCE SYSTEM</div>
-      <div class="engine-desc" id="engineDesc">The AI engine behind Sightline. IRIS turns parking cameras into live inventory, assignment, and rerouting intelligence.</div>
+      <div class="engine-desc" id="engineDesc">The AI engine behind Sightline. IRIS turns parking cameras into live operator inventory and mobile driver guidance.</div>
       <div class="engine-pillars">
         <div class="pillar" id="p1"><div class="pn">01</div><div class="ph">Sees</div><div class="ps">Every camera feed</div></div>
         <div class="pillar" id="p2"><div class="pn">02</div><div class="ph">Learns</div><div class="ps">Lot geometry</div></div>
-        <div class="pillar" id="p3"><div class="pn">03</div><div class="ph">Tells</div><div class="ps">Drivers and operators</div></div>
+        <div class="pillar" id="p3"><div class="pn">03</div><div class="ph">Guides</div><div class="ps">Operators and mobile users</div></div>
       </div>
     </div>
   `;
@@ -120,7 +120,7 @@ function phoneScene(eyebrow, title, body, phoneHtml) {
         <div class="eyebrow">${escapeHtml(eyebrow)}</div>
         <h2>${escapeHtml(title)}</h2>
         <p>${escapeHtml(body)}</p>
-        <div class="caption">Sightline product story</div>
+        <div class="caption">Driver mobile app preview</div>
       </div>
       ${phoneHtml}
     </div>
@@ -226,7 +226,7 @@ function operatorScene() {
         <div class="kpi"><span>Avg stay</span><strong>2.4h</strong><em>Down 0.2h</em></div>
       </div>
       <div class="bars-chart" id="barsChart">${[15, 22, 38, 52, 61, 68, 74, 82, 78, 65, 58, 72, 88, 92, 85].map((h) => `<div><span style="height:${h}%"></span></div>`).join('')}</div>
-      <button class="demo-launch" type="button" data-launch-platform>Launch Sightline</button>
+      <button class="demo-launch" type="button" data-launch-platform>Launch operator console</button>
     </div>
   `;
 }
@@ -235,9 +235,9 @@ function closeScene() {
   return `
     <div class="close-wrap">
       <div class="eyebrow close-eyebrow">Sightline</div>
-      <h1 class="close-title">One platform. Every driver. Everywhere.</h1>
-      <div class="close-sub">The intelligence layer for parking, for the world.</div>
-      <button class="demo-launch close-action" type="button" data-launch-platform>Launch Sightline</button>
+      <h1 class="close-title">One operator console. Every driver in motion.</h1>
+      <div class="close-sub">Operators manage Sightline on the web. Drivers get guidance in the mobile app.</div>
+      <button class="demo-launch close-action" type="button" data-launch-platform>Launch operator console</button>
     </div>
   `;
 }
@@ -257,25 +257,17 @@ function registerForm() {
         <label for="password">Password</label>
         <input id="password" name="password" type="password" value="parking123" autocomplete="new-password" required>
       </div>
-      <div class="field">
-        <label>Account type</label>
-        <div class="role-grid">
-          <label class="choice">
-            <span class="choice-copy"><strong>Provider</strong><span>Operate facilities and cameras</span></span>
-            <input type="radio" name="role" value="provider" checked>
-          </label>
-          <label class="choice">
-            <span class="choice-copy"><strong>Driver</strong><span>Use guidance and availability</span></span>
-            <input type="radio" name="role" value="driver">
-          </label>
-        </div>
+      <input type="hidden" name="role" value="provider">
+      <div class="operator-note">
+        <strong>Operator web access</strong>
+        <span>Driver onboarding belongs in the Sightline mobile app. This website is the operator console.</span>
       </div>
       <div class="field">
         <label for="organizationName">Workspace name</label>
         <input id="organizationName" name="organizationName" value="Crown City Parking Group" required>
       </div>
       <div class="field">
-        <label for="providerType">Provider type</label>
+        <label for="providerType">Operator type</label>
         <select id="providerType" name="providerType">
           <option>Commercial Parking Company</option>
           <option>University</option>
@@ -287,7 +279,7 @@ function registerForm() {
           <option>Private Business</option>
         </select>
       </div>
-      <button class="button full" type="submit">Create account</button>
+      <button class="button full" type="submit">Create operator account</button>
     </form>
   `;
 }
@@ -303,7 +295,7 @@ function loginForm() {
         <label for="loginPassword">Password</label>
         <input id="loginPassword" name="password" type="password" value="parking123" autocomplete="current-password" required>
       </div>
-      <button class="button full" type="submit">Log in</button>
+      <button class="button full" type="submit">Log in to operator console</button>
     </form>
   `;
 }

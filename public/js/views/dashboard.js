@@ -4,7 +4,7 @@ const navItems = [
   ['overview', 'Overview', 'grid'],
   ['facilities', 'Facilities', 'plus'],
   ['detection', 'Camera detection', 'camera'],
-  ['driver', 'Driver guidance', 'route'],
+  ['driver', 'Driver app sync', 'route'],
   ['account', 'Account', 'shield']
 ];
 
@@ -16,7 +16,7 @@ export function renderShell(state) {
     <main class="shell">
       <aside class="sidebar">
         ${brand()}
-        <div class="side-card"><span>Current role</span><strong>${escapeHtml(user.role === 'provider' ? 'Provider' : 'Driver')}</strong></div>
+        <div class="side-card"><span>Console</span><strong>Operator web</strong></div>
         <div class="side-card"><span>Workspace</span><strong>${escapeHtml(user.organization_name)}</strong></div>
         <div class="side-card"><span>Stored in</span><strong>SQLite database</strong></div>
         <nav class="nav" aria-label="Primary navigation">
@@ -42,17 +42,17 @@ export function renderShell(state) {
 
 function renderTopbar(state) {
   const titles = {
-    overview: ['Provider command center', 'Reliable portfolio visibility, live inventory, and persisted workspace data.'],
+    overview: ['Operator command center', 'Reliable portfolio visibility, live inventory, and persisted workspace data.'],
     facilities: ['Facilities', 'Add and review facilities stored in SQLite.'],
     detection: ['Camera detection', 'Run local camera scans and persist events against facilities.'],
-    driver: ['Driver guidance', 'Camera-confirmed spot assignment and rerouting.'],
+    driver: ['Driver app sync', 'Monitor camera-confirmed guidance sent to the Sightline mobile app.'],
     account: ['Account and persistence', 'User profile, session, and database status.']
   };
   const [title, subtitle] = titles[state.view] || titles.overview;
   const action = state.view === 'detection'
     ? `<button class="button" data-action="scan">${icon('scan')} Run scan</button>`
     : state.view === 'driver'
-      ? `<button class="button" data-action="reassign">${icon('route')} Reassign spot</button>`
+      ? `<button class="button" data-action="reassign">${icon('route')} Sync mobile assignment</button>`
       : '';
 
   return `
@@ -151,11 +151,11 @@ function renderDetection(state) {
 
 function renderDriver(state) {
   const assignment = state.workspace.assignment;
-  if (!assignment) return '<div class="empty">No driver assignment has been created yet.</div>';
+  if (!assignment) return '<div class="empty">No mobile app assignment has been created yet.</div>';
   return `
     <section class="grid content-grid">
       <article class="assignment-card">
-        <span>Assigned and reserved</span>
+        <span>Mobile app assignment</span>
         <h3>Level ${assignment.level} · Zone ${escapeHtml(assignment.zone)} · ${escapeHtml(assignment.spot_label)}</h3>
         <p>${escapeHtml(assignment.status_message)}</p>
         <div class="assignment-meta">
@@ -167,7 +167,7 @@ function renderDriver(state) {
         </div>
       </article>
       <div class="panel">
-        <h3>Guidance context</h3>
+        <h3>Operator context</h3>
         <div class="facility-list">
           ${facilityCards(state.workspace)}
         </div>
@@ -186,17 +186,18 @@ function renderAccount(state) {
           <tbody>
             <tr><th>Name</th><td>${escapeHtml(user.name)}</td></tr>
             <tr><th>Email</th><td>${escapeHtml(user.email)}</td></tr>
-            <tr><th>Role</th><td>${escapeHtml(user.role)}</td></tr>
+            <tr><th>Web access</th><td>Operator console</td></tr>
             <tr><th>Workspace</th><td>${escapeHtml(user.organization_name)}</td></tr>
-            <tr><th>Provider type</th><td>${escapeHtml(user.provider_type)}</td></tr>
+            <tr><th>Operator type</th><td>${escapeHtml(user.provider_type)}</td></tr>
           </tbody>
         </table>
       </div>
       <div class="panel">
         <h3>Reliability model</h3>
         <div class="event-list">
-          <div class="event-row"><strong>SQLite database</strong><span>Users, sessions, properties, facilities, camera events, and driver assignments are persisted.</span></div>
+          <div class="event-row"><strong>SQLite database</strong><span>Operator accounts, sessions, properties, facilities, camera events, and mobile assignments are persisted.</span></div>
           <div class="event-row"><strong>Cookie sessions</strong><span>Authentication state survives refreshes and browser restarts until expiry or logout.</span></div>
+          <div class="event-row"><strong>Driver app boundary</strong><span>Driver registration and onboarding belong in the Sightline mobile application, not the operator website.</span></div>
           <div class="event-row"><strong>Local-first demo</strong><span>No third-party service is needed to run or test the core product.</span></div>
         </div>
       </div>

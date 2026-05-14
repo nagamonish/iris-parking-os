@@ -317,7 +317,7 @@ export function addFacility(userId, body) {
     Math.max(0, Number(body.camerasOnline || 1)),
     Math.max(1, Number(body.camerasTotal || 1)),
     Math.max(75, Math.min(99, Number(body.confidence || 92))),
-    String(body.rules || 'Provider-defined access and validation rules.').trim(),
+    String(body.rules || 'Operator-defined access and validation rules.').trim(),
     nowIso()
   );
 }
