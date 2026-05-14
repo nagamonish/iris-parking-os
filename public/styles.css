@@ -136,6 +136,7 @@ a {
 }
 
 .story-shell {
+  --apple-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --story-bg: #070708;
   --story-fg: #f5f1f7;
   --story-muted: rgba(245, 241, 247, 0.42);
@@ -165,8 +166,8 @@ a {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(20px) scale(0.985);
-  transition: opacity 0.68s cubic-bezier(0.19, 1, 0.22, 1), transform 0.68s cubic-bezier(0.19, 1, 0.22, 1), visibility 0s linear 0.68s;
+  transform: translateY(34px) scale(0.975);
+  transition: opacity 1.05s var(--apple-ease), transform 1.05s var(--apple-ease), visibility 0s linear 1.05s;
 }
 
 .story-scene::before {
@@ -182,21 +183,21 @@ a {
 }
 
 .story-scene.active .product-demo-label {
-  animation: softRise 0.58s ease both 0.1s;
+  animation: softRise 0.86s var(--apple-ease) both 0.16s;
 }
 
 .story-scene.active .wordmark {
-  animation: softRise 0.72s ease both 0.22s;
+  animation: softRise 1.08s var(--apple-ease) both 0.3s;
 }
 
 .story-scene.active .tagline {
-  animation: softRise 0.6s ease both 0.44s;
+  animation: softRise 0.9s var(--apple-ease) both 0.58s;
 }
 
 @keyframes softRise {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateY(22px);
   }
 
   to {
@@ -337,7 +338,7 @@ a {
 .pillar {
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity 0.58s ease, transform 0.58s ease;
+  transition: opacity 0.86s var(--apple-ease), transform 0.86s var(--apple-ease);
 }
 
 .engine-eyebrow.on,
@@ -557,7 +558,7 @@ a {
   overflow: hidden;
   vertical-align: bottom;
   white-space: nowrap;
-  transition: max-width 1.45s steps(30);
+  transition: max-width 1.9s steps(30);
 }
 
 .typed-address.on {
@@ -581,7 +582,7 @@ a {
   border-radius: 14px;
   opacity: 0;
   transform: translateY(16px) scale(0.985);
-  transition: opacity 0.58s ease, transform 0.58s ease;
+  transition: opacity 0.9s var(--apple-ease), transform 0.9s var(--apple-ease);
 }
 
 .location-card.on {
@@ -649,7 +650,7 @@ a {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #7a4bff, #b57eff);
-  transition: width 1.05s cubic-bezier(0.19, 1, 0.22, 1);
+  transition: width 1.35s var(--apple-ease);
 }
 
 .occ-fill.on {
@@ -691,7 +692,7 @@ a {
   border-radius: 12px;
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity 0.48s ease, transform 0.48s ease;
+  transition: opacity 0.82s var(--apple-ease), transform 0.82s var(--apple-ease);
 }
 
 .nearby-card.on {
@@ -729,7 +730,7 @@ a {
   font-weight: 780;
   opacity: 0;
   transform: translateY(-10px);
-  transition: opacity 0.42s ease, transform 0.42s ease;
+  transition: opacity 0.78s var(--apple-ease), transform 0.78s var(--apple-ease);
 }
 
 .reroute-banner.on {
@@ -745,7 +746,7 @@ a {
   border-radius: 12px;
   opacity: 0;
   transform: translateY(14px);
-  transition: opacity 0.48s ease, transform 0.48s ease;
+  transition: opacity 0.86s var(--apple-ease), transform 0.86s var(--apple-ease);
 }
 
 .inlot-hud.on {
@@ -864,7 +865,7 @@ a {
   stroke-width: 4;
   stroke-dasharray: 180;
   stroke-dashoffset: 180;
-  transition: stroke-dashoffset 1.15s ease, stroke 0.35s ease;
+  transition: stroke-dashoffset 1.8s var(--apple-ease), stroke 0.7s var(--apple-ease);
 }
 
 .route-path.main.on {
@@ -884,7 +885,7 @@ a {
   stroke-dasharray: 1 9;
   opacity: 0;
   animation: routePulse 1.05s linear infinite;
-  transition: opacity 0.35s ease, stroke 0.35s ease;
+  transition: opacity 0.7s var(--apple-ease), stroke 0.7s var(--apple-ease);
 }
 
 .route-flow.green {
@@ -912,7 +913,7 @@ a {
   box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.16);
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.75);
-  transition: top 0.75s cubic-bezier(0.2, 0.8, 0.2, 1), left 0.75s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease, transform 0.28s ease;
+  transition: top 1.1s var(--apple-ease), left 1.1s var(--apple-ease), opacity 0.5s var(--apple-ease), transform 0.5s var(--apple-ease);
 }
 
 .driver-dot.on {
@@ -929,7 +930,7 @@ a {
   border-radius: 14px;
   opacity: 0;
   transform: translateY(16px);
-  transition: opacity 0.48s ease, transform 0.48s ease;
+  transition: opacity 0.86s var(--apple-ease), transform 0.86s var(--apple-ease);
 }
 
 .spot-info-card.on {
@@ -978,7 +979,7 @@ a {
   background: rgba(0, 0, 0, 0.16);
   opacity: 0;
   transform: translateY(14px);
-  transition: opacity 0.46s ease, transform 0.46s ease;
+  transition: opacity 0.82s var(--apple-ease), transform 0.82s var(--apple-ease);
 }
 
 .kpi.on {
@@ -1025,7 +1026,7 @@ a {
   background: linear-gradient(180deg, #d8bdff, #b57eff);
   transform: scaleY(0);
   transform-origin: bottom;
-  transition: transform 0.78s cubic-bezier(0.2, 0.9, 0.2, 1);
+  transition: transform 1.05s var(--apple-ease);
 }
 
 .bars-chart span.on {
@@ -1035,7 +1036,7 @@ a {
 .dashboard-demo .demo-launch {
   opacity: 0;
   transform: translateY(12px);
-  transition: opacity 0.42s ease, transform 0.42s ease;
+  transition: opacity 0.82s var(--apple-ease), transform 0.82s var(--apple-ease);
 }
 
 .dashboard-demo .demo-launch.on {

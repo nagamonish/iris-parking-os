@@ -3,8 +3,11 @@ import { renderAuth, STORY_SCENE_COUNT } from './views/auth.js';
 import { renderShell } from './views/dashboard.js';
 
 const app = document.getElementById('app');
-const SCENE_SCROLL_THRESHOLD = 72;
-const SCENE_TRANSITION_LOCK_MS = 620;
+const SCENE_SCROLL_THRESHOLD = 132;
+const SCENE_TRANSITION_LOCK_MS = 1850;
+const SCENE_WHEEL_IDLE_RESET_MS = 520;
+const SCENE_WHEEL_DELTA_LIMIT = 46;
+const TOUCH_SCENE_THRESHOLD = 112;
 const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator'];
 const ROUTE_PATHS = {
   p7: 'M 50 92 L 50 60 L 86 60 L 86 21',
@@ -26,6 +29,7 @@ const state = {
 let wheelDelta = 0;
 let sceneLockUntil = 0;
 let sceneEffectTimers = [];
+let lastWheelAt = 0;
 let touchStartY = null;
 let touchStartX = null;
 let touchStartTarget = null;
@@ -82,6 +86,7 @@ function stepScene(direction) {
   const changed = setSceneIndex(state.sceneIndex + direction);
   if (changed) {
     wheelDelta = 0;
+    lastWheelAt = 0;
     sceneLockUntil = now + SCENE_TRANSITION_LOCK_MS;
   }
   return changed;
@@ -153,68 +158,68 @@ function scheduleStorySceneEffects() {
 
   after(24, () => {
     if (sceneKey === 'engine') {
-      addOn('#engineEyebrow', 60);
-      addOn('#engineName', 180);
-      addOn('#engineExpand', 340);
-      addOn('#engineDesc', 520);
-      ['#p1', '#p2', '#p3'].forEach((selector, index) => addOn(selector, 760 + index * 150));
+      addOn('#engineEyebrow', 120);
+      addOn('#engineName', 340);
+      addOn('#engineExpand', 620);
+      addOn('#engineDesc', 900);
+      ['#p1', '#p2', '#p3'].forEach((selector, index) => addOn(selector, 1220 + index * 210));
     }
 
     if (sceneKey === 'location') {
-      addOn('#typedAddr', 120);
-      addOn('#locCard', 980);
-      addOn('#occFill', 1280);
+      addOn('#typedAddr', 180);
+      addOn('#locCard', 1320);
+      addOn('#occFill', 1720);
     }
 
     if (sceneKey === 'nearby') {
-      ['#nearby1', '#nearby2', '#nearby3', '#nearby4'].forEach((selector, index) => addOn(selector, 140 + index * 170));
+      ['#nearby1', '#nearby2', '#nearby3', '#nearby4'].forEach((selector, index) => addOn(selector, 220 + index * 230));
     }
 
     if (sceneKey === 'route') {
-      addOn('#hud1', 120);
-      addOn('#spotCard1', 260);
-      addOn('#routeMain1', 420);
-      addOn('#routeFlow1', 520);
-      addOn('#driver1', 540);
-      moveDriver('1', '49%', '88%', 560);
-      moveDriver('1', '49%', '58%', 980);
-      moveDriver('1', '84%', '58%', 1420);
-      moveDriver('1', '84%', '19%', 1860);
+      addOn('#hud1', 180);
+      addOn('#spotCard1', 420);
+      addOn('#routeMain1', 720);
+      addOn('#routeFlow1', 920);
+      addOn('#driver1', 960);
+      moveDriver('1', '49%', '88%', 980);
+      moveDriver('1', '49%', '58%', 1480);
+      moveDriver('1', '84%', '58%', 2050);
+      moveDriver('1', '84%', '19%', 2620);
     }
 
     if (sceneKey === 'reroute') {
-      addOn('#hud2', 120);
-      addOn('#spotCard2', 240);
-      addOn('#routeMain2', 380);
-      addOn('#routeFlow2', 460);
-      addOn('#driver2', 480);
-      moveDriver('2', '49%', '88%', 500);
-      moveDriver('2', '49%', '58%', 900);
-      moveDriver('2', '70%', '58%', 1250);
-      addOn('#rerouteBanner', 1500);
-      after(1520, () => {
+      addOn('#hud2', 180);
+      addOn('#spotCard2', 420);
+      addOn('#routeMain2', 700);
+      addOn('#routeFlow2', 880);
+      addOn('#driver2', 920);
+      moveDriver('2', '49%', '88%', 940);
+      moveDriver('2', '49%', '58%', 1460);
+      moveDriver('2', '70%', '58%', 2020);
+      addOn('#rerouteBanner', 2400);
+      after(2440, () => {
         sceneElement('#sp7b')?.classList.remove('target');
         sceneElement('#sp7b')?.classList.add('taken');
         sceneElement('#sp3b')?.classList.remove('open');
         sceneElement('#sp3b')?.classList.add('target-green');
       });
-      setRoutePath('2', 'p3', 1560);
-      setSceneText('#hud2Text', 'Head to <span>P3</span>', 1560);
-      setSceneText('#spotLabel', 'Spot P3', 1560);
-      setSceneText('#spotDist', '90 ft', 1560);
-      moveDriver('2', '49%', '58%', 1720);
-      moveDriver('2', '23%', '58%', 2140);
-      moveDriver('2', '23%', '19%', 2560);
+      setRoutePath('2', 'p3', 2500);
+      setSceneText('#hud2Text', 'Head to <span>P3</span>', 2500);
+      setSceneText('#spotLabel', 'Spot P3', 2500);
+      setSceneText('#spotDist', '90 ft', 2500);
+      moveDriver('2', '49%', '58%', 2760);
+      moveDriver('2', '23%', '58%', 3360);
+      moveDriver('2', '23%', '19%', 3960);
     }
 
     if (sceneKey === 'operator') {
       app.querySelectorAll('.story-scene.active .kpi').forEach((card, index) => {
-        after(100 + index * 120, () => card.classList.add('on'));
+        after(180 + index * 170, () => card.classList.add('on'));
       });
       app.querySelectorAll('.story-scene.active .bars-chart span').forEach((bar, index) => {
-        after(520 + index * 55, () => bar.classList.add('on'));
+        after(760 + index * 70, () => bar.classList.add('on'));
       });
-      addOn('.demo-launch', 1250);
+      addOn('.demo-launch', 1760);
     }
   });
 }
@@ -336,12 +341,27 @@ app.addEventListener('submit', async (event) => {
 window.addEventListener('wheel', (event) => {
   if (!isStoryMode() || state.authVisible || closestElement(event.target, '.platform-auth-panel')) return;
 
+  const now = Date.now();
   const dominantDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
   const direction = Math.sign(dominantDelta);
   if (!direction || canScrollWithinActiveScene(event.target, direction)) return;
 
   event.preventDefault();
-  wheelDelta += dominantDelta;
+
+  if (now < sceneLockUntil) {
+    wheelDelta = 0;
+    lastWheelAt = now;
+    return;
+  }
+
+  if (now - lastWheelAt > SCENE_WHEEL_IDLE_RESET_MS || Math.sign(wheelDelta) !== direction) {
+    wheelDelta = 0;
+  }
+
+  lastWheelAt = now;
+  const normalizedDelta = Math.max(-SCENE_WHEEL_DELTA_LIMIT, Math.min(SCENE_WHEEL_DELTA_LIMIT, dominantDelta));
+  wheelDelta += normalizedDelta;
+
   if (Math.abs(wheelDelta) >= SCENE_SCROLL_THRESHOLD) {
     stepScene(Math.sign(wheelDelta));
   }
@@ -387,7 +407,7 @@ window.addEventListener('touchmove', (event) => {
 
   const deltaY = touchStartY - event.touches[0].clientY;
   const deltaX = touchStartX - event.touches[0].clientX;
-  if (Math.abs(deltaY) < 58 || Math.abs(deltaY) < Math.abs(deltaX)) return;
+  if (Math.abs(deltaY) < TOUCH_SCENE_THRESHOLD || Math.abs(deltaY) < Math.abs(deltaX)) return;
 
   const direction = Math.sign(deltaY);
   if (canScrollWithinActiveScene(touchStartTarget || event.target, direction)) return;
