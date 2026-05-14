@@ -10,8 +10,8 @@ const SCENE_WHEEL_DELTA_LIMIT = 46;
 const TOUCH_SCENE_THRESHOLD = 112;
 const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator'];
 const ROUTE_PATHS = {
-  p7: 'M 50 92 L 50 60 L 86 60 L 86 21',
-  p3: 'M 50 92 L 50 60 L 24 60 L 24 21'
+  p7: 'M 50 94 C 50 84 50 76 50 68 C 50 61 56 57 63 57 L 63 50',
+  p3: 'M 50 94 C 50 82 50 75 50 68 C 50 61 56 57 63 57 L 63 17'
 };
 
 const state = {
@@ -182,9 +182,9 @@ function scheduleStorySceneEffects() {
       addOn('#routeFlow1', 920);
       addOn('#driver1', 960);
       moveDriver('1', '49%', '88%', 980);
-      moveDriver('1', '49%', '58%', 1480);
-      moveDriver('1', '84%', '58%', 2050);
-      moveDriver('1', '84%', '19%', 2620);
+      moveDriver('1', '50%', '68%', 1480);
+      moveDriver('1', '63%', '57%', 2050);
+      moveDriver('1', '63%', '50%', 2620);
     }
 
     if (sceneKey === 'reroute') {
@@ -194,8 +194,8 @@ function scheduleStorySceneEffects() {
       addOn('#routeFlow2', 880);
       addOn('#driver2', 920);
       moveDriver('2', '49%', '88%', 940);
-      moveDriver('2', '49%', '58%', 1460);
-      moveDriver('2', '70%', '58%', 2020);
+      moveDriver('2', '50%', '68%', 1460);
+      moveDriver('2', '63%', '57%', 2020);
       addOn('#rerouteBanner', 2400);
       after(2440, () => {
         sceneElement('#sp7b')?.classList.remove('target');
@@ -205,11 +205,11 @@ function scheduleStorySceneEffects() {
       });
       setRoutePath('2', 'p3', 2500);
       setSceneText('#hud2Text', 'Head to <span>P3</span>', 2500);
-      setSceneText('#spotLabel', 'Spot P3', 2500);
-      setSceneText('#spotDist', '90 ft', 2500);
-      moveDriver('2', '49%', '58%', 2760);
-      moveDriver('2', '23%', '58%', 3360);
-      moveDriver('2', '23%', '19%', 3960);
+      setSceneText('#spotLabel2', 'Spot P3', 2500);
+      setSceneText('#spotDist2', '90 ft', 2500);
+      moveDriver('2', '50%', '68%', 2760);
+      moveDriver('2', '63%', '57%', 3360);
+      moveDriver('2', '63%', '17%', 3960);
     }
 
     if (sceneKey === 'operator') {

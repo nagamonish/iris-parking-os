@@ -714,7 +714,7 @@ a {
 .lot-view {
   position: relative;
   height: 100%;
-  padding: 58px 12px 12px;
+  padding: 58px 14px 14px;
 }
 
 .reroute-banner {
@@ -722,12 +722,13 @@ a {
   gap: 8px;
   align-items: center;
   margin-bottom: 10px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-radius: 12px;
-  color: #0f2117;
-  background: #c7ffd8;
-  font-size: 13px;
-  font-weight: 780;
+  color: #defce8;
+  background: rgba(47, 184, 123, 0.2);
+  border: 1px solid rgba(125, 255, 173, 0.28);
+  font-size: 12px;
+  font-weight: 760;
   opacity: 0;
   transform: translateY(-10px);
   transition: opacity 0.78s var(--apple-ease), transform 0.78s var(--apple-ease);
@@ -742,8 +743,8 @@ a {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 12px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
   opacity: 0;
   transform: translateY(14px);
   transition: opacity 0.86s var(--apple-ease), transform 0.86s var(--apple-ease);
@@ -755,14 +756,14 @@ a {
 }
 
 .inlot-hud .arrow {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   display: grid;
   place-items: center;
   border-radius: 999px;
   color: #0a0a10;
   background: #b57eff;
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .inlot-hud .dist {
@@ -781,10 +782,12 @@ a {
 }
 
 .lot-diagram {
-  margin-top: 14px;
+  margin-top: 12px;
   padding: 14px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 66%, rgba(181, 126, 255, 0.1), transparent 34%),
+    rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(247, 242, 255, 0.09);
 }
 
@@ -810,17 +813,43 @@ a {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-top: 16px;
-  min-height: 260px;
+  min-height: 250px;
+}
+
+.lot-grid::before,
+.lot-grid::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: rgba(247, 242, 255, 0.045);
+}
+
+.lot-grid::before {
+  top: 5%;
+  bottom: 5%;
+  left: calc(50% - 5px);
+  width: 10px;
+}
+
+.lot-grid::after {
+  top: calc(66.66% - 5px);
+  left: 5%;
+  right: 5%;
+  height: 10px;
 }
 
 .lot-spot {
+  position: relative;
+  z-index: 2;
   min-height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  color: rgba(247, 242, 255, 0.5);
-  border: 1px solid rgba(247, 242, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  color: rgba(247, 242, 255, 0.52);
+  border: 1px solid rgba(247, 242, 255, 0.095);
+  background: rgba(255, 255, 255, 0.045);
   font-size: 12px;
   font-weight: 760;
 }
@@ -833,38 +862,44 @@ a {
 
 .lot-spot.target,
 .lot-spot.target-green {
-  color: #090910;
-  background: #b57eff;
-  box-shadow: 0 0 26px rgba(181, 126, 255, 0.5);
+  color: #f8f2ff;
+  border-color: rgba(181, 126, 255, 0.8);
+  background: rgba(181, 126, 255, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(247, 242, 255, 0.1), 0 0 24px rgba(181, 126, 255, 0.3);
 }
 
 .lot-spot.target-green {
-  background: #7dffad;
-  box-shadow: 0 0 26px rgba(125, 255, 173, 0.45);
+  color: #ecfff3;
+  border-color: rgba(125, 255, 173, 0.8);
+  background: rgba(47, 184, 123, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(247, 242, 255, 0.08), 0 0 24px rgba(125, 255, 173, 0.26);
 }
 
 .route-overlay {
   position: absolute;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
+  overflow: visible;
 }
 
 .route-path {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .route-path.halo {
-  stroke: rgba(181, 126, 255, 0.2);
-  stroke-width: 9;
+  stroke: rgba(181, 126, 255, 0.18);
+  stroke-width: 8;
 }
 
 .route-path.main {
   stroke: #b57eff;
-  stroke-width: 4;
-  stroke-dasharray: 180;
-  stroke-dashoffset: 180;
+  stroke-width: 3.25;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
   transition: stroke-dashoffset 1.8s var(--apple-ease), stroke 0.7s var(--apple-ease);
 }
 
@@ -879,13 +914,14 @@ a {
 .route-flow {
   fill: none;
   stroke: #f7f2ff;
-  stroke-width: 2;
+  stroke-width: 1.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 1 9;
+  stroke-dasharray: 0.02 0.08;
   opacity: 0;
   animation: routePulse 1.05s linear infinite;
   transition: opacity 0.7s var(--apple-ease), stroke 0.7s var(--apple-ease);
+  vector-effect: non-scaling-stroke;
 }
 
 .route-flow.green {
@@ -898,7 +934,7 @@ a {
 
 @keyframes routePulse {
   to {
-    stroke-dashoffset: -40;
+    stroke-dashoffset: -0.3;
   }
 }
 
@@ -906,11 +942,12 @@ a {
   position: absolute;
   left: 49%;
   top: 88%;
-  width: 14px;
-  height: 14px;
+  z-index: 4;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.13), 0 0 18px rgba(247, 242, 255, 0.24);
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.75);
   transition: top 1.1s var(--apple-ease), left 1.1s var(--apple-ease), opacity 0.5s var(--apple-ease), transform 0.5s var(--apple-ease);
@@ -925,9 +962,9 @@ a {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 14px;
+  margin-top: 12px;
   padding: 14px;
-  border-radius: 14px;
+  border-radius: 16px;
   opacity: 0;
   transform: translateY(16px);
   transition: opacity 0.86s var(--apple-ease), transform 0.86s var(--apple-ease);

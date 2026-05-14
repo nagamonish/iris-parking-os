@@ -161,8 +161,8 @@ function nearbyPhone() {
 
 function routePhone(spot, rerouted) {
   const activeSpot = rerouted ? 'P7' : spot;
-  const pathToP7 = 'M 50 92 L 50 60 L 86 60 L 86 21';
-  const pathToP3 = 'M 50 92 L 50 60 L 24 60 L 24 21';
+  const pathToP7 = 'M 50 94 C 50 84 50 76 50 68 C 50 61 56 57 63 57 L 63 50';
+  const pathToP3 = 'M 50 94 C 50 82 50 75 50 68 C 50 61 56 57 63 57 L 63 17';
   const initialPath = activeSpot === 'P3' ? pathToP3 : pathToP7;
   const targetClass = activeSpot === 'P3' ? 'target-green' : 'target';
   const prefix = rerouted ? '2' : '1';
@@ -180,14 +180,14 @@ function routePhone(spot, rerouted) {
             <div class="lot-spot ${item === activeSpot ? targetClass : item === 'P3' || item === 'P9' ? 'open' : 'taken'}" ${rerouted && item === 'P3' ? 'id="sp3b"' : ''} ${rerouted && item === 'P7' ? 'id="sp7b"' : ''}>${item}</div>
           `).join('')}
           <svg class="route-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path class="route-path halo" id="routeHalo${prefix}" d="${initialPath}"></path>
-            <path class="route-path main ${activeSpot === 'P3' ? 'green' : ''}" id="routeMain${prefix}" d="${initialPath}"></path>
-            <path class="route-flow ${activeSpot === 'P3' ? 'green' : ''}" id="routeFlow${prefix}" d="${initialPath}"></path>
+            <path class="route-path halo" id="routeHalo${prefix}" d="${initialPath}" pathLength="1"></path>
+            <path class="route-path main ${activeSpot === 'P3' ? 'green' : ''}" id="routeMain${prefix}" d="${initialPath}" pathLength="1"></path>
+            <path class="route-flow ${activeSpot === 'P3' ? 'green' : ''}" id="routeFlow${prefix}" d="${initialPath}" pathLength="1"></path>
           </svg>
           <div class="driver-dot" id="driver${prefix}"></div>
         </div>
       </div>
-      <div class="spot-info-card" id="spotCard${prefix}"><div><strong id="spotLabel">Spot ${activeSpot}</strong><span id="spotSub">Level 2 - reserved for you</span></div><b id="spotDist">60 ft</b></div>
+      <div class="spot-info-card" id="spotCard${prefix}"><div><strong id="spotLabel${prefix}">Spot ${activeSpot}</strong><span id="spotSub${prefix}">Level 2 - reserved for you</span></div><b id="spotDist${prefix}">60 ft</b></div>
     </div>
   `);
 }
