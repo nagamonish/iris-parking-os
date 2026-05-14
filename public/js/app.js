@@ -3,11 +3,11 @@ import { renderAuth, renderAuthPage, STORY_SCENE_COUNT } from './views/auth.js';
 import { renderShell } from './views/dashboard.js';
 
 const app = document.getElementById('app');
-const SCENE_SCROLL_THRESHOLD = 132;
-const SCENE_TRANSITION_LOCK_MS = 1850;
-const SCENE_WHEEL_IDLE_RESET_MS = 520;
-const SCENE_WHEEL_DELTA_LIMIT = 46;
-const TOUCH_SCENE_THRESHOLD = 112;
+const SCENE_SCROLL_THRESHOLD = 225;
+const SCENE_TRANSITION_LOCK_MS = 2250;
+const SCENE_WHEEL_IDLE_RESET_MS = 760;
+const SCENE_WHEEL_DELTA_LIMIT = 28;
+const TOUCH_SCENE_THRESHOLD = 146;
 const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator', 'close'];
 const THEME_STORAGE_KEY = 'iris-theme';
 const ROUTE_PATHS = {
