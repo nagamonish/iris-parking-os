@@ -7,7 +7,8 @@ const scenes = [
   { label: 'Availability', title: 'See every deck nearby.', kind: 'nearby' },
   { label: 'Assignment', title: 'Straight to the open spot.', kind: 'route' },
   { label: 'Reroute', title: 'Next-nearest, automatically.', kind: 'reroute' },
-  { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' }
+  { label: 'Operator', title: 'Every lot. One dashboard.', kind: 'operator' },
+  { label: 'Launch', title: 'One platform. Every driver. Everywhere.', kind: 'close' }
 ];
 
 export const STORY_SCENE_COUNT = scenes.length;
@@ -62,7 +63,8 @@ function renderScene(scene, index) {
   if (scene.kind === 'nearby') return phoneScene('Lot awareness', scene.title, 'Sightline shows parking decks around you live. Color and percent tell you instantly whether a lot is open, filling, or full.', nearbyPhone());
   if (scene.kind === 'route') return phoneScene('Driver 1 - inside the lot', scene.title, 'Once inside a Sightline-enabled lot, cameras know exactly which spots are open and route the driver there.', routePhone('P7', false));
   if (scene.kind === 'reroute') return phoneScene('Driver 2 - behind them', scene.title, 'The moment P7 is taken, Sightline reroutes the next driver to P3. No conflict. No circling.', routePhone('P3', true));
-  return operatorScene(index);
+  if (scene.kind === 'operator') return operatorScene(index);
+  return closeScene();
 }
 
 function introScene() {
@@ -207,6 +209,17 @@ function operatorScene() {
       </div>
       <div class="bars-chart" id="barsChart">${[15, 22, 38, 52, 61, 68, 74, 82, 78, 65, 58, 72, 88, 92, 85].map((h) => `<div><span style="height:${h}%"></span></div>`).join('')}</div>
       <button class="demo-launch" type="button" data-launch-platform>Launch Sightline</button>
+    </div>
+  `;
+}
+
+function closeScene() {
+  return `
+    <div class="close-wrap">
+      <div class="eyebrow close-eyebrow">Sightline</div>
+      <h1 class="close-title">One platform. Every driver. Everywhere.</h1>
+      <div class="close-sub">The intelligence layer for parking, for the world.</div>
+      <button class="demo-launch close-action" type="button" data-launch-platform>Launch Sightline</button>
     </div>
   `;
 }

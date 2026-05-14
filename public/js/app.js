@@ -8,7 +8,7 @@ const SCENE_TRANSITION_LOCK_MS = 1850;
 const SCENE_WHEEL_IDLE_RESET_MS = 520;
 const SCENE_WHEEL_DELTA_LIMIT = 46;
 const TOUCH_SCENE_THRESHOLD = 112;
-const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator'];
+const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator', 'close'];
 const ROUTE_PATHS = {
   p7: 'M 50 94 C 50 84 50 76 50 68 C 50 61 56 57 63 57 L 63 50',
   p3: 'M 50 94 C 50 82 50 75 50 68 C 50 61 56 57 63 57 L 63 17'
@@ -220,6 +220,13 @@ function scheduleStorySceneEffects() {
         after(760 + index * 70, () => bar.classList.add('on'));
       });
       addOn('.demo-launch', 1760);
+    }
+
+    if (sceneKey === 'close') {
+      addOn('.close-eyebrow', 160);
+      addOn('.close-title', 380);
+      addOn('.close-sub', 760);
+      addOn('.close-action', 1120);
     }
   });
 }
