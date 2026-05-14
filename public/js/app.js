@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { renderAuth, STORY_SCENE_COUNT } from './views/auth.js';
+import { renderAuth, renderAuthPage, STORY_SCENE_COUNT } from './views/auth.js';
 import { renderShell } from './views/dashboard.js';
 
 const app = document.getElementById('app');
@@ -18,9 +18,9 @@ const state = {
   loading: true,
   user: null,
   workspace: null,
+  route: window.location.pathname,
   view: 'overview',
   authMode: 'register',
-  authVisible: false,
   sceneIndex: 0,
   error: '',
   notice: ''
@@ -47,7 +47,9 @@ function render() {
 
   app.innerHTML = state.user && state.workspace
     ? renderShell(state)
-    : renderAuth(state);
+    : isAuthRoute()
+      ? renderAuthPage(state)
+      : renderAuth(state);
 
   queueMicrotask(scheduleStorySceneEffects);
 }
@@ -61,7 +63,19 @@ function isSignedIn() {
 }
 
 function isStoryMode() {
-  return !state.loading && !isSignedIn();
+  return !state.loading && !isSignedIn() && !isAuthRoute();
+}
+
+function isAuthRoute() {
+  return state.route === '/auth';
+}
+
+function navigate(route, patch = {}) {
+  const nextRoute = route || '/';
+  if (window.location.pathname !== nextRoute) {
+    window.history.pushState({}, '', nextRoute);
+  }
+  setState({ route: nextRoute, error: '', notice: '', ...patch });
 }
 
 function closestElement(target, selector) {
@@ -261,19 +275,19 @@ async function initialize() {
 app.addEventListener('click', async (event) => {
   const authMode = event.target.closest('[data-auth-mode]')?.dataset.authMode;
   if (authMode) {
-    setState({ authMode, authVisible: true, error: '', notice: '' });
+    setState({ authMode, error: '', notice: '' });
     return;
   }
 
   const launchAuth = event.target.closest('[data-launch-platform]');
   if (launchAuth) {
-    setState({ authVisible: true, authMode: 'login', error: '', notice: '' });
+    navigate('/auth', { authMode: 'login' });
     return;
   }
 
-  const closeAuth = event.target.closest('[data-close-auth]');
-  if (closeAuth) {
-    setState({ authVisible: false, error: '', notice: '' });
+  const backStory = event.target.closest('[data-back-story]');
+  if (backStory) {
+    navigate('/');
     return;
   }
 
@@ -302,7 +316,7 @@ app.addEventListener('click', async (event) => {
   try {
     if (action === 'logout') {
       await api.logout();
-      setState({ user: null, workspace: null, authMode: 'login', authVisible: false, notice: 'Logged out.', view: 'overview' });
+      navigate('/auth', { user: null, workspace: null, authMode: 'login', notice: 'Logged out.', view: 'overview' });
     }
     if (action === 'refresh') await loadWorkspace();
     if (action === 'scan') {
@@ -328,12 +342,14 @@ app.addEventListener('submit', async (event) => {
     if (type === 'register') {
       const payload = formData(form);
       const { user, workspace } = await api.register(payload);
-      setState({ user, workspace, authVisible: false, error: '', notice: '', view: 'overview' });
+      setState({ user, workspace, route: '/app', error: '', notice: '', view: 'overview' });
+      if (window.location.pathname !== '/app') window.history.pushState({}, '', '/app');
     }
 
     if (type === 'login') {
       const { user, workspace } = await api.login(formData(form));
-      setState({ user, workspace, authVisible: false, error: '', notice: '', view: 'overview' });
+      setState({ user, workspace, route: '/app', error: '', notice: '', view: 'overview' });
+      if (window.location.pathname !== '/app') window.history.pushState({}, '', '/app');
     }
 
     if (type === 'facility') {
@@ -346,7 +362,7 @@ app.addEventListener('submit', async (event) => {
 });
 
 window.addEventListener('wheel', (event) => {
-  if (!isStoryMode() || state.authVisible || closestElement(event.target, '.platform-auth-panel')) return;
+  if (!isStoryMode()) return;
 
   const now = Date.now();
   const dominantDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
@@ -375,7 +391,7 @@ window.addEventListener('wheel', (event) => {
 }, { passive: false });
 
 window.addEventListener('keydown', (event) => {
-  if (!isStoryMode() || state.authVisible || isTypingTarget(event.target)) return;
+  if (!isStoryMode() || isTypingTarget(event.target)) return;
 
   const nextKeys = new Set(['ArrowDown', 'PageDown', ' ', 'Enter']);
   const previousKeys = new Set(['ArrowUp', 'PageUp']);
@@ -402,7 +418,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 window.addEventListener('touchstart', (event) => {
-  if (!isStoryMode() || state.authVisible || !event.touches.length) return;
+  if (!isStoryMode() || !event.touches.length) return;
 
   touchStartY = event.touches[0].clientY;
   touchStartX = event.touches[0].clientX;
@@ -410,7 +426,7 @@ window.addEventListener('touchstart', (event) => {
 }, { passive: true });
 
 window.addEventListener('touchmove', (event) => {
-  if (!isStoryMode() || state.authVisible || touchStartY === null || !event.touches.length) return;
+  if (!isStoryMode() || touchStartY === null || !event.touches.length) return;
 
   const deltaY = touchStartY - event.touches[0].clientY;
   const deltaX = touchStartX - event.touches[0].clientX;
@@ -430,6 +446,10 @@ window.addEventListener('touchend', () => {
   touchStartY = null;
   touchStartX = null;
   touchStartTarget = null;
+});
+
+window.addEventListener('popstate', () => {
+  setState({ route: window.location.pathname, error: '', notice: '' });
 });
 
 initialize();

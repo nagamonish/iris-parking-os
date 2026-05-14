@@ -15,7 +15,6 @@ export const STORY_SCENE_COUNT = scenes.length;
 
 export function renderAuth(state) {
   const activeIndex = Math.max(0, Math.min(scenes.length - 1, Number(state.sceneIndex || 0)));
-  const isRegister = state.authMode === 'register';
 
   return `
     <main class="story-shell">
@@ -36,14 +35,33 @@ export function renderAuth(state) {
       <button class="story-next" type="button" data-next-scene aria-label="Go to next section">
         <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 24 L32 40 L46 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </button>
+    </main>
+  `;
+}
 
-      <aside class="platform-auth-panel ${state.authVisible ? 'open' : ''}" aria-hidden="${state.authVisible ? 'false' : 'true'}">
-        <div class="auth-panel-head">
-          ${brand()}
-          <button class="icon-button" type="button" data-close-auth aria-label="Close platform access">x</button>
+export function renderAuthPage(state) {
+  const isRegister = state.authMode === 'register';
+
+  return `
+    <main class="auth-page">
+      <section class="auth-hero">
+        <button class="auth-back" type="button" data-back-story aria-label="Back to product story">Back to demo</button>
+        <div class="auth-hero-copy">
+          <div class="product-demo-label">Sightline · Platform access</div>
+          <h1>${isRegister ? 'Create your operator workspace.' : 'Welcome back to Sightline.'}</h1>
+          <p>${isRegister ? 'Set up a persisted IRIS workspace with SQLite-backed accounts, sessions, and facility data.' : 'Log into your persisted workspace to manage facilities, cameras, occupancy, and assignments.'}</p>
         </div>
-        <h2>${isRegister ? 'Create your workspace' : 'Welcome back'}</h2>
-        <p>${isRegister ? 'Accounts are stored in SQLite with persistent sessions.' : 'Log back into your persisted IRIS workspace.'}</p>
+        <div class="auth-proof-grid" aria-label="Platform highlights">
+          <div><span>SQLite</span><strong>Persistent sessions</strong></div>
+          <div><span>Live ops</span><strong>Facility dashboard</strong></div>
+          <div><span>IRIS</span><strong>Camera intelligence</strong></div>
+        </div>
+      </section>
+
+      <section class="auth-card" aria-labelledby="authTitle">
+        ${brand()}
+        <h2 id="authTitle">${isRegister ? 'Create account' : 'Log in'}</h2>
+        <p>${isRegister ? 'Register as an operator or driver to enter the platform.' : 'Use your saved account to continue.'}</p>
         <div class="auth-tabs">
           <button class="auth-tab ${isRegister ? 'active' : ''}" data-auth-mode="register">Register</button>
           <button class="auth-tab ${!isRegister ? 'active' : ''}" data-auth-mode="login">Login</button>
@@ -51,7 +69,7 @@ export function renderAuth(state) {
         ${state.error ? `<div class="error">${escapeHtml(state.error)}</div>` : ''}
         ${state.notice ? `<div class="notice">${escapeHtml(state.notice)}</div>` : ''}
         ${isRegister ? registerForm() : loginForm()}
-      </aside>
+      </section>
     </main>
   `;
 }
