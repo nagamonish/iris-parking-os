@@ -20,6 +20,8 @@ export function icon(name) {
     shield: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.4 7 10 4.1-1.6 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>',
     plus: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
     scan: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3"/><path d="M16 4h3a1 1 0 0 1 1 1v3"/><path d="M20 16v3a1 1 0 0 1-1 1h-3"/><path d="M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 12h8"/></svg>',
+    sun: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4V2"/><path d="M12 22v-2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M4 12H2"/><path d="M22 12h-2"/><path d="m4.93 19.07 1.41-1.41"/><path d="m17.66 6.34 1.41-1.41"/><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/></svg>',
+    moon: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 7 7 0 1 0 20 15.5Z"/></svg>',
     logout: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M14 4h5v16h-5"/></svg>'
   };
   return icons[name] || '';
@@ -31,6 +33,17 @@ export function brand() {
       <span class="brand-mark">${icon('eye')}</span>
       <span>IRIS Parking OS</span>
     </div>
+  `;
+}
+
+export function themeToggle(theme, compact = false) {
+  const nextTheme = theme === 'dark' ? 'light' : 'dark';
+  const label = theme === 'dark' ? 'Light' : 'Dark';
+  return `
+    <button class="theme-toggle ${compact ? 'compact' : ''}" type="button" data-action="theme" aria-label="Switch to ${nextTheme} mode" title="Switch to ${nextTheme} mode">
+      ${icon(theme === 'dark' ? 'sun' : 'moon')}
+      <span>${label}</span>
+    </button>
   `;
 }
 

@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>IRIS Parking OS</title>
     <meta name="description" content="Operator web console for Sightline parking intelligence, facilities, cameras, occupancy, and mobile app assignments.">
+    <script>
+      (() => {
+        const saved = localStorage.getItem('iris-theme');
+        const theme = saved === 'dark' || saved === 'light'
+          ? saved
+          : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>

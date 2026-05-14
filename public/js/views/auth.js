@@ -1,4 +1,4 @@
-import { brand, escapeHtml } from '../components.js';
+import { brand, escapeHtml, themeToggle } from '../components.js';
 
 const scenes = [
   { label: 'Brand', title: 'Sightline.', kind: 'intro' },
@@ -18,6 +18,7 @@ export function renderAuth(state) {
 
   return `
     <main class="story-shell">
+      <div class="theme-floating">${themeToggle(state.theme, true)}</div>
       <div class="story-stage" aria-label="Sightline product slideshow">
         ${scenes.map((scene, index) => `
           <section class="story-scene ${index === activeIndex ? 'active' : ''}" data-scene-kind="${scene.kind}" aria-hidden="${index === activeIndex ? 'false' : 'true'}">
@@ -44,6 +45,7 @@ export function renderAuthPage(state) {
 
   return `
     <main class="auth-page">
+      <div class="theme-floating">${themeToggle(state.theme, true)}</div>
       <section class="auth-hero">
         <button class="auth-back" type="button" data-back-story aria-label="Back to product story">Back to demo</button>
         <div class="auth-hero-copy">

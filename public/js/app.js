@@ -9,10 +9,20 @@ const SCENE_WHEEL_IDLE_RESET_MS = 520;
 const SCENE_WHEEL_DELTA_LIMIT = 46;
 const TOUCH_SCENE_THRESHOLD = 112;
 const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator', 'close'];
+const THEME_STORAGE_KEY = 'iris-theme';
 const ROUTE_PATHS = {
   p7: 'M 50 94 C 50 84 50 76 50 68 C 50 61 56 57 63 57 L 63 50',
   p3: 'M 50 94 C 50 82 50 75 50 68 C 50 61 56 57 63 57 L 63 17'
 };
+
+function systemTheme() {
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function storedTheme() {
+  const theme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  return theme === 'dark' || theme === 'light' ? theme : systemTheme();
+}
 
 const state = {
   loading: true,
@@ -21,6 +31,7 @@ const state = {
   route: window.location.pathname,
   view: 'overview',
   authMode: 'register',
+  theme: storedTheme(),
   sceneIndex: 0,
   error: '',
   notice: ''
@@ -34,8 +45,23 @@ let touchStartY = null;
 let touchStartX = null;
 let touchStartTarget = null;
 
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+}
+
+function setTheme(theme) {
+  const nextTheme = theme === 'dark' ? 'dark' : 'light';
+  window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  applyTheme(nextTheme);
+  setState({ theme: nextTheme });
+}
+
+applyTheme(state.theme);
+
 function setState(patch) {
   Object.assign(state, patch);
+  if (patch.theme) applyTheme(state.theme);
   render();
 }
 
@@ -314,6 +340,10 @@ app.addEventListener('click', async (event) => {
   if (!action) return;
 
   try {
+    if (action === 'theme') {
+      setTheme(state.theme === 'dark' ? 'light' : 'dark');
+      return;
+    }
     if (action === 'logout') {
       await api.logout();
       navigate('/auth', { user: null, workspace: null, authMode: 'login', notice: 'Logged out.', view: 'overview' });

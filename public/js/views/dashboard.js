@@ -1,4 +1,4 @@
-import { brand, escapeHtml, formatNumber, icon, metric, pill } from '../components.js';
+import { brand, escapeHtml, formatNumber, icon, metric, pill, themeToggle } from '../components.js';
 
 const navItems = [
   ['overview', 'Overview', 'grid'],
@@ -28,6 +28,7 @@ export function renderShell(state) {
           `).join('')}
         </nav>
         <div class="sidebar-footer">
+          ${themeToggle(state.theme)}
           <button class="button secondary full" data-action="refresh">Refresh data</button>
           <button class="button danger full" data-action="logout">${icon('logout')} Log out</button>
         </div>
