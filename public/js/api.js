@@ -1,8 +1,9 @@
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(path, {
     credentials: 'same-origin',
     headers: {
-      'content-type': 'application/json',
+      ...(isFormData ? {} : { 'content-type': 'application/json' }),
       ...(options.headers || {})
     },
     ...options
@@ -23,5 +24,7 @@ export const api = {
   logout: () => request('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) }),
   addFacility: (body) => request('/api/facilities', { method: 'POST', body: JSON.stringify(body) }),
   scan: () => request('/api/scan', { method: 'POST', body: JSON.stringify({}) }),
+  cameraEvent: (body) => request('/api/camera-events', { method: 'POST', body: JSON.stringify(body) }),
+  visionAnalyze: (body, options = {}) => fetch('/api/vision/analyze', { method: 'POST', credentials: 'same-origin', body, ...options }),
   reassign: () => request('/api/driver/reassign', { method: 'POST', body: JSON.stringify({}) })
 };

@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { escapeHtml, formatNumber } from './components.js';
 import { renderAuth, renderAuthPage, STORY_SCENE_COUNT } from './views/auth.js';
 import { renderShell } from './views/dashboard.js';
 
@@ -10,6 +11,8 @@ const SCENE_WHEEL_DELTA_LIMIT = 28;
 const TOUCH_SCENE_THRESHOLD = 146;
 const STORY_SCENE_KEYS = ['intro', 'engine', 'location', 'nearby', 'route', 'reroute', 'operator', 'close'];
 const THEME_STORAGE_KEY = 'iris-theme';
+const VIDEO_FILE_PATTERN = /\.(mp4|mov|m4v|webm|avi|mkv)$/i;
+const TRUTH_FILE_PATTERN = /\.(json|csv)$/i;
 const ROUTE_PATHS = {
   p7: 'M 50 94 C 50 84 50 76 50 68 C 50 61 56 57 63 57 L 63 50',
   p3: 'M 50 94 C 50 82 50 75 50 68 C 50 61 56 57 63 57 L 63 17'
@@ -44,6 +47,22 @@ let lastWheelAt = 0;
 let touchStartY = null;
 let touchStartX = null;
 let touchStartTarget = null;
+const videoTest = {
+  timer: null,
+  url: '',
+  lastFrame: null,
+  lastEventAt: 0,
+  eventCount: 0,
+  canvas: null,
+  pending: false
+};
+const visionRun = {
+  controller: null,
+  active: false,
+  events: 0,
+  file: null,
+  truthFile: null
+};
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
@@ -284,6 +303,387 @@ function canScrollWithinActiveScene(target, direction) {
   return scene.scrollTop > 2;
 }
 
+function workspaceFacilities(workspace = state.workspace) {
+  return workspace?.properties?.flatMap((property) => property.facilities) || [];
+}
+
+function cameraMapRows(workspace) {
+  return workspaceFacilities(workspace).map((facility) => `
+    <tr>
+      <td><strong>${escapeHtml(facility.name)}</strong><br><span>${escapeHtml(facility.type)}</span></td>
+      <td>${formatNumber(facility.open_spaces)} open</td>
+      <td>${facility.cameras_online}/${facility.cameras_total}</td>
+      <td>${facility.confidence}%</td>
+    </tr>
+  `).join('');
+}
+
+function eventList(workspace) {
+  if (!workspace?.events?.length) return '<div class="empty">Run a camera scan to create persisted events.</div>';
+  return `
+    <div class="event-list">
+      ${workspace.events.map((event) => `
+        <div class="event-row live-event-row">
+          <strong>${escapeHtml(event.event_type.replaceAll('_', ' '))}</strong>
+          <span>${escapeHtml(event.message)} · ${event.confidence}% · ${new Date(event.created_at).toLocaleString()}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function refreshDetectionSurface(workspace) {
+  const mapBody = app.querySelector('[data-camera-map-body]');
+  const eventLog = app.querySelector('[data-event-log]');
+  if (mapBody) mapBody.innerHTML = cameraMapRows(workspace);
+  if (eventLog) eventLog.innerHTML = eventList(workspace);
+}
+
+function setVideoStatus(message, tone = '') {
+  const status = app.querySelector('[data-video-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
+function stopVideoTestFeed(message = 'Video test stopped.') {
+  if (videoTest.timer) window.clearInterval(videoTest.timer);
+  videoTest.timer = null;
+  videoTest.lastFrame = null;
+  videoTest.lastEventAt = 0;
+  videoTest.eventCount = 0;
+  videoTest.pending = false;
+  const video = app.querySelector('[data-video-preview]');
+  if (video) video.pause();
+  setVideoStatus(message);
+}
+
+function handleVideoFile(file) {
+  stopVideoTestFeed('Footage loaded. Press Start live test when ready.');
+  if (videoTest.url) URL.revokeObjectURL(videoTest.url);
+  videoTest.url = URL.createObjectURL(file);
+  const video = app.querySelector('[data-video-preview]');
+  if (video) {
+    video.src = videoTest.url;
+    video.load();
+  }
+}
+
+function isAcceptedVideoFile(file) {
+  return Boolean(file && (file.type.startsWith('video/') || VIDEO_FILE_PATTERN.test(file.name)));
+}
+
+function isAcceptedTruthFile(file) {
+  return Boolean(file && (
+    file.type === 'application/json'
+    || file.type === 'text/csv'
+    || TRUTH_FILE_PATTERN.test(file.name)
+  ));
+}
+
+function assignFileToInput(input, file) {
+  if (!input || !file) return;
+  try {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+  } catch {
+    // Some browsers keep file inputs read-only for scripted drops. The app
+    // still stores the file in memory for analysis in those cases.
+  }
+}
+
+function handleVisionFile(file, input = app.querySelector('[data-vision-input]')) {
+  if (!isAcceptedVideoFile(file)) {
+    setVisionStatus('Drop a video file such as MOV, MP4, WebM, M4V, AVI, or MKV.', 'error');
+    return false;
+  }
+  visionRun.file = file;
+  assignFileToInput(input, file);
+  setVisionStatus(`${file.name} loaded. Start CV analysis when ready.`);
+  appendVisionLine('Footage ready', `${file.name} · ${Math.max(1, Math.round(file.size / 1024 / 1024))} MB`);
+  return true;
+}
+
+function handleTruthFile(file, input = app.querySelector('[data-truth-input]')) {
+  if (!isAcceptedTruthFile(file)) {
+    setVisionStatus('Ground truth must be a JSON or CSV file.', 'error');
+    return false;
+  }
+  visionRun.truthFile = file;
+  assignFileToInput(input, file);
+  setVisionStatus(`${file.name} loaded. Analysis will run in validation mode.`);
+  appendVisionLine('Ground truth ready', `${file.name} · events will be scored without writing to SQLite`);
+  return true;
+}
+
+function frameSignature(video) {
+  if (!video.videoWidth || !video.videoHeight) return null;
+  const width = 96;
+  const height = 54;
+  if (!videoTest.canvas) videoTest.canvas = document.createElement('canvas');
+  videoTest.canvas.width = width;
+  videoTest.canvas.height = height;
+  const context = videoTest.canvas.getContext('2d', { willReadFrequently: true });
+  context.drawImage(video, 0, 0, width, height);
+  const data = context.getImageData(0, 0, width, height).data;
+  const signature = [];
+  for (let index = 0; index < data.length; index += 64) {
+    signature.push(Math.round((data[index] + data[index + 1] + data[index + 2]) / 3));
+  }
+  return signature;
+}
+
+function motionScore(current, previous) {
+  if (!current || !previous || current.length !== previous.length) return 0;
+  const delta = current.reduce((sum, value, index) => sum + Math.abs(value - previous[index]), 0) / current.length;
+  return Math.max(0, Math.min(100, Math.round(delta * 3.2)));
+}
+
+async function publishVideoDetection(score) {
+  const facilitySelect = app.querySelector('[data-video-facility]');
+  const eventMode = app.querySelector('[data-video-event-mode]')?.value || 'auto';
+  const facilityId = facilitySelect?.value;
+  if (!facilityId || videoTest.pending) return;
+
+  const now = Date.now();
+  if (now - videoTest.lastEventAt < 1350) return;
+  videoTest.lastEventAt = now;
+  videoTest.pending = true;
+
+  const eventType = eventMode === 'auto'
+    ? videoTest.eventCount % 4 === 1 ? 'space_opened' : 'vehicle_entered'
+    : eventMode;
+  const confidence = Math.max(72, Math.min(99, 78 + Math.round(score * 0.45)));
+  const delta = eventType === 'vehicle_entered' ? 1 : eventType === 'space_opened' ? -1 : 0;
+
+  try {
+    const { workspace } = await api.cameraEvent({
+      facilityId,
+      eventType,
+      confidence,
+      motionScore: score,
+      delta
+    });
+    state.workspace = workspace;
+    videoTest.eventCount += 1;
+    refreshDetectionSurface(workspace);
+    setVideoStatus(`Live test running · ${videoTest.eventCount} event${videoTest.eventCount === 1 ? '' : 's'} recorded · latest motion score ${score}.`, 'live');
+  } catch (error) {
+    setVideoStatus(error.message, 'error');
+  } finally {
+    videoTest.pending = false;
+  }
+}
+
+async function startVideoTestFeed() {
+  const video = app.querySelector('[data-video-preview]');
+  const thresholdInput = app.querySelector('[data-video-threshold]');
+  const threshold = Math.max(4, Math.min(80, Number(thresholdInput?.value || 18)));
+  if (!video?.src) {
+    setVideoStatus('Choose a video file first.', 'error');
+    return;
+  }
+
+  stopVideoTestFeed('Starting local video detector...');
+  video.loop = true;
+  video.muted = true;
+  await video.play();
+  setVideoStatus('Live test running · waiting for motion.', 'live');
+
+  videoTest.timer = window.setInterval(() => {
+    const current = frameSignature(video);
+    const score = motionScore(current, videoTest.lastFrame);
+    videoTest.lastFrame = current;
+    if (score >= threshold) publishVideoDetection(score);
+  }, 650);
+}
+
+function setVisionStatus(message, tone = '') {
+  const status = app.querySelector('[data-vision-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
+function appendVisionLine(title, detail = '') {
+  const output = app.querySelector('[data-vision-output]');
+  if (!output) return;
+  const row = document.createElement('div');
+  row.className = 'vision-line';
+  row.innerHTML = `<strong>${escapeHtml(title)}</strong>${escapeHtml(detail)}`;
+  output.prepend(row);
+  while (output.children.length > 8) output.lastElementChild?.remove();
+}
+
+function stopVisionAnalysis(message = 'CV analysis stopped.') {
+  if (visionRun.controller) visionRun.controller.abort();
+  visionRun.controller = null;
+  visionRun.active = false;
+  setVisionStatus(message);
+}
+
+function handleVisionPayload(payload) {
+  if (!payload || !payload.type) return;
+  if (payload.workspace) {
+    state.workspace = payload.workspace;
+    refreshDetectionSurface(payload.workspace);
+  }
+
+  if (payload.type === 'started') {
+    setVisionStatus(payload.message || 'Vision detector started.', 'live');
+    appendVisionLine('Started', 'Local detector process is running.');
+  }
+  if (payload.type === 'calibration') {
+    setVisionStatus(`Calibration loaded · ${payload.spaces?.length || 0} spaces · ${payload.lanes?.length || 0} lanes.`, 'live');
+    appendVisionLine('Calibration', `${payload.spaces?.length || 0} stall zones, ${payload.lanes?.length || 0} lane zones, ${payload.duration || 0}s clip.`);
+  }
+  if (payload.type === 'ground_truth') {
+    setVisionStatus(`Ground truth loaded · ${payload.events} event${payload.events === 1 ? '' : 's'} · ±${payload.toleranceSeconds}s.`, 'live');
+    appendVisionLine('Ground truth', `${payload.events} labeled events · tolerance ${payload.toleranceSeconds}s.`);
+  }
+  if (payload.type === 'progress') {
+    setVisionStatus(`Analyzing real footage · ${payload.videoSecond}s · ${payload.detections} vehicle candidate${payload.detections === 1 ? '' : 's'}.`, 'live');
+  }
+  if (payload.type === 'event') {
+    visionRun.events += 1;
+    const modeLabel = payload.validationOnly ? 'validation event' : 'event written to SQLite';
+    setVisionStatus(`Live CV analysis · ${visionRun.events} ${modeLabel}${visionRun.events === 1 ? '' : 's'}.`, 'live');
+    appendVisionLine(payload.eventType.replaceAll('_', ' '), `${payload.spaceId || 'scene'} · ${payload.confidence}% confidence · ${payload.message || ''}`);
+  }
+  if (payload.type === 'validation') {
+    const pct = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
+    const latency = payload.meanLatencySeconds === null ? 'No matched latency yet' : `${payload.meanLatencySeconds}s avg latency`;
+    setVisionStatus(`Validation complete · Precision ${pct(payload.precision)} · Recall ${pct(payload.recall)} · F1 ${pct(payload.f1)}.`, payload.f1 >= 0.75 ? 'live' : 'error');
+    appendVisionLine('Validation report', `TP ${payload.truePositives} · FP ${payload.falsePositives} · FN ${payload.falseNegatives} · ${latency}`);
+    (payload.warnings || []).forEach((warning) => {
+      appendVisionLine('Validation warning', warning);
+    });
+    (payload.confidenceBuckets || []).forEach((bucket) => {
+      appendVisionLine(`${bucket.bucket}% confidence`, `${bucket.correct}/${bucket.total} correct · ${pct(bucket.accuracy)} observed accuracy`);
+    });
+    if (payload.missed?.length) {
+      appendVisionLine('Missed events', payload.missed.slice(0, 3).map((event) => `${event.eventType} ${event.spaceId || ''} @ ${event.time}s`).join(' · '));
+    }
+    if (payload.falsePositiveSamples?.length) {
+      appendVisionLine('False positives', payload.falsePositiveSamples.slice(0, 3).map((event) => `${event.eventType} ${event.spaceId || ''} @ ${event.videoSecond || event.timestamp}s`).join(' · '));
+    }
+  }
+  if (payload.type === 'warning') appendVisionLine('Warning', payload.message || '');
+  if (payload.type === 'setup_required') {
+    setVisionStatus(payload.message, 'error');
+    appendVisionLine('Setup required', payload.install || payload.message || '');
+  }
+  if (payload.type === 'error') {
+    setVisionStatus(payload.message || 'Vision detector failed.', 'error');
+    appendVisionLine('Error', payload.message || '');
+  }
+  if (payload.type === 'summary') {
+    setVisionStatus(`CV analysis complete · ${payload.events} event${payload.events === 1 ? '' : 's'} · ${payload.detector}.`, 'live');
+    const modelLabel = payload.model ? ` (${payload.model})` : '';
+    const fallbackLabel = payload.fallbackModel ? ` · fallback ${payload.fallbackModel}` : '';
+    appendVisionLine('Summary', `${payload.processedFrames} sampled frames in ${payload.runtimeSeconds}s using ${payload.detector}${modelLabel}${fallbackLabel}.`);
+  }
+  if (payload.type === 'complete') {
+    visionRun.active = false;
+    visionRun.controller = null;
+  }
+}
+
+async function startVisionAnalysis() {
+  const fileInput = app.querySelector('[data-vision-input]');
+  const facilityId = app.querySelector('[data-vision-facility]')?.value;
+  const calibration = app.querySelector('[data-vision-calibration]')?.value || '{}';
+  const confidence = app.querySelector('[data-vision-confidence]')?.value || '0.55';
+  const model = app.querySelector('[data-vision-model]')?.value || 'auto';
+  const sampleRate = app.querySelector('[data-vision-sample-rate]')?.value || '4';
+  const file = visionRun.file || fileInput?.files?.[0];
+  const truthInput = app.querySelector('[data-truth-input]');
+  const truthFile = visionRun.truthFile || truthInput?.files?.[0];
+
+  if (!facilityId) {
+    setVisionStatus('Choose a facility before analysis.', 'error');
+    return;
+  }
+  if (!file) {
+    setVisionStatus('Upload real parking-lot footage first.', 'error');
+    return;
+  }
+  if (!isAcceptedVideoFile(file)) {
+    setVisionStatus('Use a video file such as MOV, MP4, WebM, M4V, AVI, or MKV.', 'error');
+    return;
+  }
+  if (truthFile && !isAcceptedTruthFile(truthFile)) {
+    setVisionStatus('Ground truth must be a JSON or CSV file.', 'error');
+    return;
+  }
+
+  try {
+    JSON.parse(calibration || '{}');
+  } catch {
+    setVisionStatus('Calibration JSON is invalid.', 'error');
+    return;
+  }
+
+  stopVideoTestFeed('Motion smoke test stopped while CV analysis started.');
+  if (visionRun.active) stopVisionAnalysis('Restarting CV analysis...');
+  visionRun.controller = new AbortController();
+  visionRun.active = true;
+  visionRun.events = 0;
+  app.querySelector('[data-vision-output]')?.replaceChildren();
+  setVisionStatus('Uploading footage to the local detector...', 'live');
+
+  const body = new FormData();
+  body.append('facilityId', facilityId);
+  body.append('video', file);
+  body.append('calibration', calibration);
+  body.append('confidence', confidence);
+  body.append('sampleRate', sampleRate);
+  body.append('model', model);
+  if (truthFile) {
+    body.append('groundTruth', truthFile);
+    body.append('persistEvents', 'false');
+  } else {
+    body.append('persistEvents', 'true');
+  }
+
+  try {
+    const response = await api.visionAnalyze(body, { signal: visionRun.controller.signal });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || 'Vision analysis failed.');
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      lines.map((line) => line.trim()).filter(Boolean).forEach((line) => {
+        try {
+          handleVisionPayload(JSON.parse(line));
+        } catch {
+          appendVisionLine('Detector log', line);
+        }
+      });
+    }
+    if (buffer.trim()) handleVisionPayload(JSON.parse(buffer.trim()));
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      setVisionStatus('CV analysis stopped.');
+    } else {
+      setVisionStatus(error.message, 'error');
+      appendVisionLine('Error', error.message);
+    }
+  } finally {
+    visionRun.active = false;
+    visionRun.controller = null;
+  }
+}
+
 async function loadWorkspace() {
   const { workspace } = await api.workspace();
   setState({ user: workspace.user, workspace, error: '', notice: '' });
@@ -331,6 +731,8 @@ app.addEventListener('click', async (event) => {
 
   const view = event.target.closest('[data-view]')?.dataset.view;
   if (view) {
+    if (state.view === 'detection' && view !== 'detection') stopVideoTestFeed();
+    if (state.view === 'detection' && view !== 'detection' && visionRun.active) stopVisionAnalysis();
     setState({ view });
     window.scrollTo({ top: 0, behavior: 'auto' });
     return;
@@ -341,15 +743,41 @@ app.addEventListener('click', async (event) => {
 
   try {
     if (action === 'theme') {
+      if (videoTest.timer) stopVideoTestFeed('Video test stopped while switching theme.');
+      if (visionRun.active) stopVisionAnalysis('CV analysis stopped while switching theme.');
       setTheme(state.theme === 'dark' ? 'light' : 'dark');
       return;
     }
+    if (action === 'vision-start') {
+      await startVisionAnalysis();
+      return;
+    }
+    if (action === 'vision-stop') {
+      stopVisionAnalysis();
+      return;
+    }
+    if (action === 'video-test-start') {
+      await startVideoTestFeed();
+      return;
+    }
+    if (action === 'video-test-stop') {
+      stopVideoTestFeed();
+      return;
+    }
     if (action === 'logout') {
+      stopVideoTestFeed();
+      if (visionRun.active) stopVisionAnalysis();
       await api.logout();
       navigate('/auth', { user: null, workspace: null, authMode: 'login', notice: 'Logged out.', view: 'overview' });
     }
-    if (action === 'refresh') await loadWorkspace();
+    if (action === 'refresh') {
+      if (videoTest.timer) stopVideoTestFeed('Video test stopped while refreshing data.');
+      if (visionRun.active) stopVisionAnalysis('CV analysis stopped while refreshing data.');
+      await loadWorkspace();
+    }
     if (action === 'scan') {
+      if (videoTest.timer) stopVideoTestFeed('Video test stopped while running a scan.');
+      if (visionRun.active) stopVisionAnalysis('CV analysis stopped while running a scan.');
       const { workspace } = await api.scan();
       setState({ workspace, notice: 'Camera scan saved.', error: '' });
     }
@@ -359,6 +787,85 @@ app.addEventListener('click', async (event) => {
     }
   } catch (error) {
     setState({ error: error.message, notice: '' });
+  }
+});
+
+app.addEventListener('change', (event) => {
+  const input = closestElement(event.target, '[data-video-input]');
+  if (input?.files?.length) {
+    if (!isAcceptedVideoFile(input.files[0])) {
+      setVideoStatus('Choose a video file such as MOV, MP4, WebM, M4V, AVI, or MKV.', 'error');
+      return;
+    }
+    handleVideoFile(input.files[0]);
+    return;
+  }
+
+  const visionInput = closestElement(event.target, '[data-vision-input]');
+  if (visionInput?.files?.length) {
+    handleVisionFile(visionInput.files[0], visionInput);
+  }
+
+  const truthInput = closestElement(event.target, '[data-truth-input]');
+  if (truthInput?.files?.length) {
+    handleTruthFile(truthInput.files[0], truthInput);
+  }
+});
+
+function closestDropZone(target) {
+  return closestElement(target, '[data-video-drop], [data-vision-drop], [data-truth-drop]');
+}
+
+function setDropActive(dropZone, active) {
+  if (dropZone) dropZone.classList.toggle('is-dragging', active);
+}
+
+app.addEventListener('dragenter', (event) => {
+  const dropZone = closestDropZone(event.target);
+  if (!dropZone) return;
+  event.preventDefault();
+  setDropActive(dropZone, true);
+});
+
+app.addEventListener('dragover', (event) => {
+  const dropZone = closestDropZone(event.target);
+  if (!dropZone) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  setDropActive(dropZone, true);
+});
+
+app.addEventListener('dragleave', (event) => {
+  const dropZone = closestDropZone(event.target);
+  if (!dropZone || dropZone.contains(event.relatedTarget)) return;
+  setDropActive(dropZone, false);
+});
+
+app.addEventListener('drop', (event) => {
+  const dropZone = closestDropZone(event.target);
+  if (!dropZone) return;
+  event.preventDefault();
+  setDropActive(dropZone, false);
+
+  const isTruthDrop = dropZone.matches('[data-truth-drop]');
+  const file = Array.from(event.dataTransfer.files || []).find(isTruthDrop ? isAcceptedTruthFile : isAcceptedVideoFile);
+  if (!file) {
+    const message = isTruthDrop
+      ? 'Drop a JSON or CSV ground-truth file.'
+      : 'Drop a video file such as MOV, MP4, WebM, M4V, AVI, or MKV.';
+    if (dropZone.matches('[data-vision-drop], [data-truth-drop]')) setVisionStatus(message, 'error');
+    else setVideoStatus(message, 'error');
+    return;
+  }
+
+  const input = dropZone.querySelector('input[type="file"]');
+  assignFileToInput(input, file);
+  if (isTruthDrop) {
+    handleTruthFile(file, input);
+  } else if (dropZone.matches('[data-vision-drop]')) {
+    handleVisionFile(file, input);
+  } else {
+    handleVideoFile(file);
   }
 });
 

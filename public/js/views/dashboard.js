@@ -45,7 +45,7 @@ function renderTopbar(state) {
   const titles = {
     overview: ['Operator command center', 'Reliable portfolio visibility, live inventory, and persisted workspace data.'],
     facilities: ['Facilities', 'Add and review facilities stored in SQLite.'],
-    detection: ['Camera detection', 'Run local camera scans and persist events against facilities.'],
+    detection: ['Camera detection', 'Replay local footage and persist live test events against facilities.'],
     driver: ['Driver app sync', 'Monitor camera-confirmed guidance sent to the Sightline mobile app.'],
     account: ['Account and persistence', 'User profile, session, and database status.']
   };
@@ -124,27 +124,103 @@ function renderFacilities(state) {
 
 function renderDetection(state) {
   const { workspace } = state;
+  const facilities = allFacilities(workspace);
+  const calibration = escapeHtml(JSON.stringify(defaultVisionCalibration(), null, 2));
   return `
-    <section class="grid content-grid">
+    <section class="grid detection-grid">
       <div class="panel">
         <h3>Camera-to-space map</h3>
         <table class="table">
           <thead><tr><th>Facility</th><th>Spaces</th><th>Cameras</th><th>Confidence</th></tr></thead>
-          <tbody>
-            ${allFacilities(workspace).map((facility) => `
-              <tr>
-                <td><strong>${escapeHtml(facility.name)}</strong><br><span>${escapeHtml(facility.type)}</span></td>
-                <td>${formatNumber(facility.open_spaces)} open</td>
-                <td>${facility.cameras_online}/${facility.cameras_total}</td>
-                <td>${facility.confidence}%</td>
-              </tr>
-            `).join('')}
-          </tbody>
+          <tbody data-camera-map-body>${cameraMapRows(workspace)}</tbody>
         </table>
+      </div>
+      <div class="panel vision-panel">
+        <h3>Real-world CV detector</h3>
+        <p class="panel-copy">Upload parking-lot footage and run the local YOLO/OpenCV detector. The template JSON is only a starting point; replace it with this camera's actual stall and lane polygons before scoring spaces.</p>
+        <div class="video-controls-grid">
+          <div class="field">
+            <label for="visionFacility">Facility</label>
+            <select id="visionFacility" data-vision-facility>
+              ${facilities.map((facility) => `<option value="${escapeHtml(facility.id)}">${escapeHtml(facility.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="visionConfidence">Vehicle confidence</label>
+            <input id="visionConfidence" data-vision-confidence type="text" inputmode="decimal" value="0.55">
+          </div>
+          <div class="field">
+            <label for="visionModel">Detection model</label>
+            <select id="visionModel" data-vision-model>
+              <option value="auto">Auto: OBB then v8</option>
+              <option value="yolo26m-obb.pt">26m OBB</option>
+              <option value="yolo26s-obb.pt">26s OBB</option>
+              <option value="yolov8n.pt">v8n boxes</option>
+              <option value="none">Motion fallback</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="visionSampleRate">Sample rate</label>
+            <input id="visionSampleRate" data-vision-sample-rate type="text" inputmode="decimal" value="4">
+          </div>
+        </div>
+        <label class="video-drop" data-vision-drop>
+          <span>Drop real footage here or choose MP4, MOV, or WebM</span>
+          <input type="file" accept="video/*,.mp4,.mov,.m4v,.webm,.avi,.mkv" data-vision-input>
+        </label>
+        <label class="video-drop truth-drop" data-truth-drop>
+          <span>Optional: drop ground-truth JSON or CSV to score accuracy</span>
+          <input type="file" accept="application/json,text/csv,.json,.csv" data-truth-input>
+        </label>
+        <div class="field">
+          <label for="visionCalibration">Camera calibration JSON</label>
+          <textarea id="visionCalibration" class="calibration-input" data-vision-calibration>${calibration}</textarea>
+        </div>
+        <div class="video-actions">
+          <button class="button" type="button" data-action="vision-start">${icon('scan')} Start CV analysis</button>
+          <button class="button secondary" type="button" data-action="vision-stop">Stop</button>
+        </div>
+        <div class="video-status" data-vision-status>Waiting for real footage.</div>
+        <div class="vision-output" data-vision-output></div>
       </div>
       <div class="panel">
         <h3>Event log</h3>
-        ${eventList(workspace)}
+        <div data-event-log>${eventList(workspace)}</div>
+      </div>
+      <div class="panel video-test-panel">
+        <h3>Motion smoke test</h3>
+        <p class="panel-copy">Use this lightweight browser-only tester for quick plumbing checks. Real camera validation should use the CV detector above.</p>
+        <div class="video-controls-grid">
+          <div class="field">
+            <label for="videoFacility">Facility</label>
+            <select id="videoFacility" data-video-facility>
+              ${facilities.map((facility) => `<option value="${escapeHtml(facility.id)}">${escapeHtml(facility.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label for="videoEventMode">Event output</label>
+            <select id="videoEventMode" data-video-event-mode>
+              <option value="auto">Auto cycle</option>
+              <option value="vehicle_entered">Vehicle entered</option>
+              <option value="space_opened">Space opened</option>
+              <option value="motion_detected">Motion only</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="videoThreshold">Motion threshold</label>
+            <input id="videoThreshold" data-video-threshold type="text" inputmode="numeric" value="18">
+          </div>
+        </div>
+        <label class="video-drop" data-video-drop>
+          <span>Drop simple footage here or choose MP4, MOV, or WebM</span>
+          <input type="file" accept="video/*" data-video-input>
+        </label>
+        <video class="feed-video" data-video-preview controls muted playsinline></video>
+        <div class="video-actions">
+          <button class="button" type="button" data-action="video-test-start">${icon('scan')} Start live test</button>
+          <button class="button secondary" type="button" data-action="video-test-stop">Stop</button>
+        </div>
+        <div class="video-status" data-video-status>Waiting for footage.</div>
       </div>
     </section>
   `;
@@ -208,6 +284,37 @@ function renderAccount(state) {
 
 function allFacilities(workspace) {
   return workspace.properties.flatMap((property) => property.facilities);
+}
+
+function defaultVisionCalibration() {
+  return {
+    spaces: [
+      { id: 'P1', points: [[0.15, 0.24], [0.255, 0.24], [0.255, 0.43], [0.15, 0.43]] },
+      { id: 'P2', points: [[0.29, 0.24], [0.395, 0.24], [0.395, 0.43], [0.29, 0.43]] },
+      { id: 'P3', points: [[0.43, 0.24], [0.535, 0.24], [0.535, 0.43], [0.43, 0.43]] },
+      { id: 'P4', points: [[0.57, 0.24], [0.675, 0.24], [0.675, 0.43], [0.57, 0.43]] },
+      { id: 'P5', points: [[0.71, 0.24], [0.815, 0.24], [0.815, 0.43], [0.71, 0.43]] },
+      { id: 'P6', points: [[0.15, 0.54], [0.255, 0.54], [0.255, 0.73], [0.15, 0.73]] },
+      { id: 'P7', points: [[0.29, 0.54], [0.395, 0.54], [0.395, 0.73], [0.29, 0.73]] },
+      { id: 'P8', points: [[0.43, 0.54], [0.535, 0.54], [0.535, 0.73], [0.43, 0.73]] },
+      { id: 'P9', points: [[0.57, 0.54], [0.675, 0.54], [0.675, 0.73], [0.57, 0.73]] },
+      { id: 'P10', points: [[0.71, 0.54], [0.815, 0.54], [0.815, 0.73], [0.71, 0.73]] }
+    ],
+    lanes: [
+      { id: 'main_lane', points: [[0.04, 0.72], [0.96, 0.72], [0.96, 0.92], [0.04, 0.92]] }
+    ]
+  };
+}
+
+function cameraMapRows(workspace) {
+  return allFacilities(workspace).map((facility) => `
+    <tr>
+      <td><strong>${escapeHtml(facility.name)}</strong><br><span>${escapeHtml(facility.type)}</span></td>
+      <td>${formatNumber(facility.open_spaces)} open</td>
+      <td>${facility.cameras_online}/${facility.cameras_total}</td>
+      <td>${facility.confidence}%</td>
+    </tr>
+  `).join('');
 }
 
 function facilityCards(workspace) {
