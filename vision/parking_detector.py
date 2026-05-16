@@ -565,6 +565,149 @@ class VehicleDetector:
         return detections
 
 
+def _iou(box_a, box_b):
+    """Axis-aligned bounding-box IoU. Both args are [x1, y1, x2, y2]."""
+    ix1 = max(box_a[0], box_b[0])
+    iy1 = max(box_a[1], box_b[1])
+    ix2 = min(box_a[2], box_b[2])
+    iy2 = min(box_a[3], box_b[3])
+    iw = max(0.0, ix2 - ix1)
+    ih = max(0.0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = max(0.0, box_a[2] - box_a[0]) * max(0.0, box_a[3] - box_a[1])
+    area_b = max(0.0, box_b[2] - box_b[0]) * max(0.0, box_b[3] - box_b[1])
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+class Track:
+    """One tracked vehicle. Carries a stable id and a short centroid history
+    so downstream consumers (lane-crossing logic) can detect transitions."""
+
+    __slots__ = ("id", "box", "polygon", "confidence", "label", "source",
+                 "age", "hits", "centroid_history", "last_seen_ts")
+
+    def __init__(self, track_id, detection, timestamp):
+        self.id = track_id
+        self.box = list(detection["box"])
+        self.polygon = detection.get("polygon")
+        self.confidence = float(detection.get("confidence", 0.0))
+        self.label = detection.get("label", "vehicle")
+        self.source = detection.get("source")
+        self.age = 0          # frames since the track was last matched
+        self.hits = 1         # total matched updates
+        self.last_seen_ts = timestamp
+        self.centroid_history = deque(maxlen=8)
+        self.centroid_history.append(self._centroid_from_box(self.box))
+
+    @staticmethod
+    def _centroid_from_box(box):
+        return ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
+
+    @property
+    def centroid(self):
+        return self.centroid_history[-1]
+
+    @property
+    def previous_centroid(self):
+        return self.centroid_history[-2] if len(self.centroid_history) >= 2 else self.centroid
+
+    def update_with(self, detection, timestamp):
+        self.box = list(detection["box"])
+        self.polygon = detection.get("polygon")
+        self.confidence = float(detection.get("confidence", self.confidence))
+        self.label = detection.get("label", self.label)
+        self.source = detection.get("source", self.source)
+        self.age = 0
+        self.hits += 1
+        self.last_seen_ts = timestamp
+        self.centroid_history.append(self._centroid_from_box(self.box))
+
+
+class IOUTracker:
+    """Greedy IoU-based vehicle tracker.
+
+    Each new detection is matched to the highest-IoU existing track above
+    ``iou_threshold``. Unmatched tracks age; once they hit ``max_age``
+    consecutive unmatched updates they are dropped. Unmatched detections
+    start new tracks. ``min_hits`` gates a track from being reported as
+    confirmed until it has been seen that many times — keeps single-frame
+    flickers from leaking out.
+
+    Pure stdlib; no numpy/cv2 dependency so it's cheap to import in tests.
+    """
+
+    def __init__(self, iou_threshold=0.2, max_age=3, min_hits=2):
+        self.iou_threshold = float(iou_threshold)
+        self.max_age = int(max_age)
+        self.min_hits = int(min_hits)
+        self._next_id = 1
+        self._tracks = []
+
+    @property
+    def tracks(self):
+        return list(self._tracks)
+
+    def confirmed_tracks(self):
+        return [t for t in self._tracks if t.hits >= self.min_hits and t.age == 0]
+
+    def update(self, detections, timestamp):
+        """Match detections to existing tracks. Returns the updated track list.
+
+        Order of operations:
+            1. Compute all (track, detection) IoU pairs above threshold.
+            2. Greedy-match, descending IoU.
+            3. Unmatched tracks age by 1; if age > max_age, drop.
+            4. Unmatched detections seed new tracks.
+        """
+        detections = list(detections or [])
+        if not self._tracks:
+            # Fast path — every detection becomes a new track.
+            for det in detections:
+                self._tracks.append(Track(self._next_id, det, timestamp))
+                self._next_id += 1
+            return self.confirmed_tracks()
+
+        pairs = []
+        for ti, track in enumerate(self._tracks):
+            for di, det in enumerate(detections):
+                iou = _iou(track.box, det["box"])
+                if iou >= self.iou_threshold:
+                    pairs.append((iou, ti, di))
+        pairs.sort(reverse=True)
+
+        matched_tracks = set()
+        matched_dets = set()
+        for iou, ti, di in pairs:
+            if ti in matched_tracks or di in matched_dets:
+                continue
+            self._tracks[ti].update_with(detections[di], timestamp)
+            matched_tracks.add(ti)
+            matched_dets.add(di)
+
+        # Age unmatched tracks; expire those past max_age.
+        survivors = []
+        for ti, track in enumerate(self._tracks):
+            if ti in matched_tracks:
+                survivors.append(track)
+                continue
+            track.age += 1
+            if track.age <= self.max_age:
+                survivors.append(track)
+        self._tracks = survivors
+
+        # Seed new tracks from unmatched detections.
+        for di, det in enumerate(detections):
+            if di in matched_dets:
+                continue
+            self._tracks.append(Track(self._next_id, det, timestamp))
+            self._next_id += 1
+
+        return self.confirmed_tracks()
+
+
 class OccupancyModel:
     def __init__(
         self,
@@ -591,26 +734,13 @@ class OccupancyModel:
         self.space_state = {space["id"]: None for space in spaces}
         self.lane_cooldown = {lane["id"]: 0.0 for lane in lanes}
         self.last_burst_warning_at = -999.0
-        self.previous_detections = []
+        self.tracker = IOUTracker()
+        # Per-(track_id, lane_id) → bool. Lets us fire an event only when a
+        # track crosses the lane boundary, not while it's idling inside.
+        self._track_in_lane = {}
 
-    def moving_detections(self, detections):
-        if not self.previous_detections:
-            return []
-
-        movement_threshold = max(18.0, math.hypot(self.width, self.height) * 0.014)
-        max_tracking_jump = max(130.0, math.hypot(self.width, self.height) * 0.16)
-        moving = []
-        for detection in detections:
-            if detection.get("source") == "motion":
-                moving.append(detection)
-                continue
-            distances = [
-                center_distance(detection, previous)
-                for previous in self.previous_detections
-            ]
-            if distances and movement_threshold <= min(distances) <= max_tracking_jump:
-                moving.append(detection)
-        return moving
+    def _point_in_lane(self, x, y, lane):
+        return cv2.pointPolygonTest(lane["polygon"], (float(x), float(y)), False) >= 0
 
     def assign_detections_to_spaces(self, detections):
         assigned = {space["id"]: {"score": 0.0, "confidences": []} for space in self.spaces}
@@ -635,7 +765,7 @@ class OccupancyModel:
     def update(self, detections, frame_index, timestamp):
         events = []
         space_changes = []
-        moving_detections = self.moving_detections(detections)
+        tracks = self.tracker.update(detections, timestamp)
         assigned_spaces = self.assign_detections_to_spaces(detections)
         for space in self.spaces:
             assignment = assigned_spaces[space["id"]]
@@ -691,25 +821,52 @@ class OccupancyModel:
         else:
             events.extend(space_changes)
 
+        # ----- lane events: fire once per track when it CROSSES the lane edge -----
         for lane in self.lanes:
-            if timestamp < self.warmup_seconds or timestamp < self.lane_cooldown[lane["id"]]:
-                continue
-            lane_hits = [d for d in moving_detections if center_in_region(d, lane)]
-            if lane_hits:
-                best = max(lane_hits, key=lambda item: item["confidence"])
+            for track in tracks:
+                cx, cy = track.centroid
+                now_inside = self._point_in_lane(cx, cy, lane)
+                key = (track.id, lane["id"])
+                was_inside = self._track_in_lane.get(key, False)
+                self._track_in_lane[key] = now_inside
+
+                if was_inside == now_inside:
+                    continue  # no crossing this tick
+                if timestamp < self.warmup_seconds:
+                    continue
+                if timestamp < self.lane_cooldown[lane["id"]]:
+                    continue
+
+                direction = "enter" if now_inside else "exit"
+                # Optional second check: the previous centroid should sit on the
+                # opposite side of the polygon. Skips spurious flips that can
+                # happen for tracks initialised right on the boundary.
+                if len(track.centroid_history) >= 2:
+                    pcx, pcy = track.previous_centroid
+                    prev_inside = self._point_in_lane(pcx, pcy, lane)
+                    if prev_inside == now_inside:
+                        continue
+
                 self.lane_cooldown[lane["id"]] = timestamp + self.lane_cooldown_seconds
                 events.append({
                     "type": "event",
                     "eventType": "motion_detected",
                     "spaceId": lane["id"],
-                    "confidence": int(round(max(0.55, min(0.96, best["confidence"])) * 100)),
+                    "trackId": track.id,
+                    "direction": direction,
+                    "confidence": int(round(max(0.55, min(0.96, track.confidence)) * 100)),
                     "motionScore": 70,
                     "delta": 0,
                     "timestamp": timestamp,
-                    "message": f"tracked vehicle motion through lane {lane['id']}."
+                    "message": f"track {track.id} {direction}ed lane {lane['id']}."
                 })
 
-        self.previous_detections = detections
+        # Drop lane-state for tracks that disappeared so the dict doesn't grow.
+        active_ids = {t.id for t in tracks}
+        stale_keys = [k for k in self._track_in_lane if k[0] not in active_ids]
+        for k in stale_keys:
+            del self._track_in_lane[k]
+
         return events
 
 
