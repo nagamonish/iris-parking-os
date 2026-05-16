@@ -1,0 +1,10 @@
+{
+  "toleranceSeconds": 2.5,
+  "events": [
+    {
+      "timeSeconds": 5.55,
+      "eventType": "motion_detected",
+      "spaceId": "main_lane"
+    }
+  ]
+}

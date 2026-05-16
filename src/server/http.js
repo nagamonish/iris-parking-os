@@ -12,6 +12,9 @@ const MIME_TYPES = new Map([
   ['.jpg', 'image/jpeg'],
   ['.jpeg', 'image/jpeg'],
   ['.webp', 'image/webp'],
+  ['.webm', 'video/webm'],
+  ['.mp4', 'video/mp4'],
+  ['.mov', 'video/quicktime'],
   ['.ico', 'image/x-icon']
 ]);
 
@@ -28,17 +31,103 @@ export function sendError(res, status, message) {
 }
 
 export async function readJson(req) {
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  if (!chunks.length) return {};
+  const body = await readBody(req, 1024 * 1024);
+  if (!body.length) return {};
 
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return JSON.parse(body.toString('utf8'));
   } catch {
     const error = new Error('Invalid JSON body');
     error.status = 400;
     throw error;
   }
+}
+
+export async function readBody(req, maxBytes = 1024 * 1024 * 50) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      const error = new Error('Upload is too large.');
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+function splitBuffer(buffer, separator) {
+  const parts = [];
+  let start = 0;
+  let index = buffer.indexOf(separator, start);
+  while (index !== -1) {
+    parts.push(buffer.subarray(start, index));
+    start = index + separator.length;
+    index = buffer.indexOf(separator, start);
+  }
+  parts.push(buffer.subarray(start));
+  return parts;
+}
+
+function parseContentDisposition(value) {
+  return Object.fromEntries(
+    String(value || '')
+      .split(';')
+      .slice(1)
+      .map((part) => part.trim().match(/^([^=]+)="?([^"]*)"?$/))
+      .filter(Boolean)
+      .map((match) => [match[1], match[2]])
+  );
+}
+
+export async function readMultipartForm(req, { maxBytes = 1024 * 1024 * 500 } = {}) {
+  const contentType = req.headers['content-type'] || '';
+  const boundary = contentType.match(/boundary=([^;]+)/)?.[1];
+  if (!boundary) {
+    const error = new Error('Multipart boundary is missing.');
+    error.status = 400;
+    throw error;
+  }
+
+  const body = await readBody(req, maxBytes);
+  const delimiter = Buffer.from(`--${boundary}`);
+  const fields = {};
+  const files = {};
+
+  for (const rawPart of splitBuffer(body, delimiter)) {
+    let part = rawPart;
+    if (!part.length || part.equals(Buffer.from('--\r\n')) || part.equals(Buffer.from('--'))) continue;
+    if (part.subarray(0, 2).toString() === '\r\n') part = part.subarray(2);
+    if (part.subarray(-2).toString() === '\r\n') part = part.subarray(0, -2);
+    if (part.subarray(-2).toString() === '--') part = part.subarray(0, -2);
+
+    const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+    if (headerEnd === -1) continue;
+
+    const headerLines = part.subarray(0, headerEnd).toString('utf8').split('\r\n');
+    const headers = Object.fromEntries(headerLines.map((line) => {
+      const [name, ...rest] = line.split(':');
+      return [name.trim().toLowerCase(), rest.join(':').trim()];
+    }));
+    const disposition = parseContentDisposition(headers['content-disposition']);
+    const name = disposition.name;
+    if (!name) continue;
+
+    const content = part.subarray(headerEnd + 4);
+    if (disposition.filename) {
+      files[name] = {
+        filename: path.basename(disposition.filename),
+        contentType: headers['content-type'] || 'application/octet-stream',
+        data: content
+      };
+    } else {
+      fields[name] = content.toString('utf8');
+    }
+  }
+
+  return { fields, files };
 }
 
 export function routeUrl(req) {

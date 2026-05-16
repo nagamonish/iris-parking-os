@@ -357,6 +357,66 @@ export function runCameraScan(userId) {
   });
 }
 
+export function recordCameraEvent(userId, body) {
+  const facility = db.prepare(`
+    SELECT facilities.*
+    FROM facilities
+    JOIN properties ON properties.id = facilities.property_id
+    WHERE properties.user_id = ?
+      AND facilities.id = ?
+    LIMIT 1
+  `).get(userId, String(body.facilityId || ''));
+
+  if (!facility) throw new Error('Choose a facility in this workspace.');
+
+  const allowedEvents = ['vehicle_entered', 'vehicle_exited', 'space_opened', 'space_occupied', 'motion_detected'];
+  const eventType = allowedEvents.includes(body.eventType)
+    ? body.eventType
+    : 'motion_detected';
+  const confidence = Math.max(50, Math.min(99, Math.round(Number(body.confidence || facility.confidence))));
+  const motionScore = Math.max(0, Math.min(100, Math.round(Number(body.motionScore || 0))));
+  const rawDelta = Number(body.delta || 0);
+  const delta = ['vehicle_entered', 'space_occupied'].includes(eventType)
+    ? Math.max(1, Math.min(4, Math.round(rawDelta || 1)))
+    : ['vehicle_exited', 'space_opened'].includes(eventType)
+      ? -Math.max(1, Math.min(4, Math.abs(Math.round(rawDelta || -1))))
+      : 0;
+  const occupied = Math.max(0, Math.min(facility.capacity, facility.occupied + delta));
+  const timestamp = nowIso();
+  const source = String(body.source || 'camera').trim();
+  const label = eventType.replaceAll('_', ' ');
+  const direction = delta > 0 ? 'occupancy increased' : delta < 0 ? 'open space detected' : 'motion classified';
+  const space = body.spaceId ? ` at ${String(body.spaceId).trim()}` : '';
+  const message = body.message
+    ? `${facility.name}: ${source} ${String(body.message).trim()}`
+    : `${facility.name}: ${source} ${label}${space} (${direction}, motion score ${motionScore}).`;
+
+  db.prepare(`
+    UPDATE facilities
+    SET occupied = ?, confidence = ?, updated_at = ?
+    WHERE id = ?
+  `).run(occupied, confidence, timestamp, facility.id);
+
+  db.prepare(`
+    INSERT INTO camera_events (id, facility_id, event_type, message, confidence, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    id('event'),
+    facility.id,
+    eventType,
+    message,
+    confidence,
+    timestamp
+  );
+}
+
+export function recordCameraTestEvent(userId, body) {
+  recordCameraEvent(userId, {
+    ...body,
+    source: body.source || 'test video'
+  });
+}
+
 export function reassignDriver(userId) {
   const facilities = db.prepare(`
     SELECT facilities.*

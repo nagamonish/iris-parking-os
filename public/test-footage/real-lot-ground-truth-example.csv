@@ -1,0 +1,2 @@
+timeSeconds,eventType,spotId,toleranceSeconds
+5.55,motion_detected,main_lane,2.5

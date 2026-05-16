@@ -6,6 +6,8 @@ import db, {
   getUserByEmail,
   getWorkspace,
   initializeDatabase,
+  recordCameraEvent,
+  recordCameraTestEvent,
   reassignDriver,
   runCameraScan,
   seedWorkspace
@@ -19,7 +21,8 @@ import {
   publicUser,
   verifyPassword
 } from './auth.js';
-import { clearSessionCookie, readJson, routeUrl, sendError, sendJson, serveStatic } from './http.js';
+import { clearSessionCookie, readJson, readMultipartForm, routeUrl, sendError, sendJson, serveStatic } from './http.js';
+import { persistGroundTruthUpload, persistVisionUpload, spawnVisionDetector } from './vision.js';
 
 const PORT = Number(process.env.PORT || 4180);
 const publicDir = path.join(process.cwd(), 'public');
@@ -90,6 +93,119 @@ function requireUser(req, res) {
   return user;
 }
 
+function writeNdjson(res, payload) {
+  res.write(`${JSON.stringify(payload)}\n`);
+}
+
+function parseDetectorLine(line) {
+  try {
+    return JSON.parse(line);
+  } catch {
+    return { type: 'log', message: line };
+  }
+}
+
+async function analyzeVision(req, res, user) {
+  if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can run vision detection.');
+
+  const { fields, files } = await readMultipartForm(req);
+  const facilityId = String(fields.facilityId || '');
+  const file = files.video;
+  const groundTruthFile = files.groundTruth;
+  const persistEvents = fields.persistEvents !== 'false';
+  if (!facilityId) return sendError(res, 400, 'Choose a facility before running vision detection.');
+  if (!file?.data?.length) return sendError(res, 400, 'Upload real parking-lot footage first.');
+
+  const { videoPath, calibrationPath } = await persistVisionUpload({
+    file,
+    calibration: fields.calibration || '{}'
+  });
+  const groundTruthPath = await persistGroundTruthUpload(groundTruthFile);
+
+  res.writeHead(200, {
+    'content-type': 'application/x-ndjson; charset=utf-8',
+    'cache-control': 'no-store'
+  });
+
+  writeNdjson(res, { type: 'started', message: 'Vision detector started.' });
+
+  const child = spawnVisionDetector({
+    videoPath,
+    calibrationPath,
+    model: fields.model || 'auto',
+    confidence: Number(fields.confidence || 0.55),
+    sampleRate: Number(fields.sampleRate || 4),
+    warmupSeconds: Number(fields.warmupSeconds || 3.2),
+    maxSpaceEventsPerSecond: Number(fields.maxSpaceEventsPerSecond || 2),
+    laneCooldownSeconds: Number(fields.laneCooldownSeconds || 5),
+    groundTruthPath
+  });
+
+  res.on('close', () => {
+    if (!res.writableEnded && !child.killed) child.kill('SIGTERM');
+  });
+
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+
+  child.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString('utf8');
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop() || '';
+
+    for (const line of lines.map((value) => value.trim()).filter(Boolean)) {
+      const payload = parseDetectorLine(line);
+      if (payload.type === 'event') {
+        if (persistEvents) {
+          recordCameraEvent(user.id, {
+            facilityId,
+            eventType: payload.eventType,
+            confidence: payload.confidence,
+            motionScore: payload.motionScore,
+            delta: payload.delta,
+            source: payload.detector === 'motion_fallback'
+              ? 'motion fallback'
+              : payload.detector === 'yolo_obb' || payload.detector === 'auto_obb_v8'
+                ? 'YOLO OBB vision model'
+                : 'vision model',
+            spaceId: payload.spaceId,
+            message: payload.message
+          });
+          writeNdjson(res, {
+            ...payload,
+            workspace: getWorkspace(user.id)
+          });
+        } else {
+          writeNdjson(res, { ...payload, validationOnly: true });
+        }
+      } else {
+        writeNdjson(res, payload);
+      }
+    }
+  });
+
+  child.stderr.on('data', (chunk) => {
+    stderrBuffer += chunk.toString('utf8');
+  });
+
+  child.on('error', (error) => {
+    writeNdjson(res, { type: 'error', message: error.message });
+    res.end();
+  });
+
+  child.on('close', (code) => {
+    if (stdoutBuffer.trim()) writeNdjson(res, parseDetectorLine(stdoutBuffer.trim()));
+    if (code !== 0) {
+      writeNdjson(res, {
+        type: 'error',
+        message: stderrBuffer.trim() || `Vision detector exited with code ${code}.`
+      });
+    }
+    writeNdjson(res, { type: 'complete', code, workspace: getWorkspace(user.id) });
+    res.end();
+  });
+}
+
 async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/auth/register') return register(req, res);
   if (req.method === 'POST' && url.pathname === '/api/auth/login') return login(req, res);
@@ -110,6 +226,11 @@ async function handleApi(req, res, url) {
     return sendJson(res, 200, { workspace: getWorkspace(user.id) });
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/vision/analyze') {
+    await analyzeVision(req, res, user);
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/api/facilities') {
     if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can add facilities.');
     addFacility(user.id, await readJson(req));
@@ -119,6 +240,12 @@ async function handleApi(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/scan') {
     runCameraScan(user.id);
     return sendJson(res, 200, { workspace: getWorkspace(user.id) });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/camera-events') {
+    if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can record camera events.');
+    recordCameraTestEvent(user.id, await readJson(req));
+    return sendJson(res, 201, { workspace: getWorkspace(user.id) });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/driver/reassign') {
