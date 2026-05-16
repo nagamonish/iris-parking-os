@@ -73,6 +73,12 @@ export function initializeDatabase() {
       created_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS camera_calibrations (
+      facility_id TEXT PRIMARY KEY REFERENCES facilities(id) ON DELETE CASCADE,
+      calibration_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS driver_assignments (
       user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       facility_id TEXT NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
@@ -249,6 +255,13 @@ export function getWorkspace(userId) {
     ORDER BY camera_events.created_at DESC
     LIMIT 8
   `).all(userId);
+  const calibrationRows = db.prepare(`
+    SELECT camera_calibrations.*
+    FROM camera_calibrations
+    JOIN facilities ON facilities.id = camera_calibrations.facility_id
+    JOIN properties ON properties.id = facilities.property_id
+    WHERE properties.user_id = ?
+  `).all(userId);
   const assignment = db.prepare(`
     SELECT driver_assignments.*, facilities.name AS facility_name
     FROM driver_assignments
@@ -288,6 +301,15 @@ export function getWorkspace(userId) {
         }))
     })),
     events,
+    calibrations: Object.fromEntries(calibrationRows.map((row) => {
+      let calibration = {};
+      try {
+        calibration = JSON.parse(row.calibration_json);
+      } catch {
+        calibration = {};
+      }
+      return [row.facility_id, { calibration, updated_at: row.updated_at }];
+    })),
     assignment
   };
 }
@@ -415,6 +437,83 @@ export function recordCameraTestEvent(userId, body) {
     ...body,
     source: body.source || 'test video'
   });
+}
+
+function normalizeCalibrationRegion(region, index, type) {
+  const idValue = String(region?.id || region?.label || `${type}_${index + 1}`).trim();
+  const points = Array.isArray(region?.points) ? region.points : [];
+  if (!idValue) throw calibrationError('Each calibration zone needs an id.');
+  if (points.length < 3) throw calibrationError(`${idValue} needs at least 3 points.`);
+
+  return {
+    id: idValue,
+    points: points.map((point) => {
+      if (!Array.isArray(point) || point.length < 2) {
+        throw calibrationError(`${idValue} has an invalid point.`);
+      }
+      const x = Number(point[0]);
+      const y = Number(point[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw calibrationError(`${idValue} has non-numeric coordinates.`);
+      }
+      return [
+        Math.max(0, Math.min(1, Number(x.toFixed(4)))),
+        Math.max(0, Math.min(1, Number(y.toFixed(4))))
+      ];
+    })
+  };
+}
+
+function calibrationError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
+function normalizeCalibrationPayload(calibration) {
+  let payload;
+  try {
+    payload = typeof calibration === 'string' ? JSON.parse(calibration) : calibration;
+  } catch {
+    throw calibrationError('Calibration JSON is invalid.');
+  }
+  const spaces = Array.isArray(payload?.spaces) ? payload.spaces : [];
+  const lanes = Array.isArray(payload?.lanes) ? payload.lanes : [];
+  if (!spaces.length && !lanes.length) {
+    throw calibrationError('Add at least one stall or lane polygon before saving calibration.');
+  }
+
+  return {
+    spaces: spaces.map((region, index) => normalizeCalibrationRegion(region, index, 'space')),
+    lanes: lanes.map((region, index) => normalizeCalibrationRegion(region, index, 'lane')),
+    notes: String(payload?.notes || 'Camera-specific calibration drawn in the operator console.').trim()
+  };
+}
+
+export function saveFacilityCalibration(userId, body) {
+  const facilityId = String(body.facilityId || '').trim();
+  const facility = db.prepare(`
+    SELECT facilities.*
+    FROM facilities
+    JOIN properties ON properties.id = facilities.property_id
+    WHERE properties.user_id = ?
+      AND facilities.id = ?
+    LIMIT 1
+  `).get(userId, facilityId);
+
+  if (!facility) throw calibrationError('Choose a facility in this workspace.');
+
+  const calibration = normalizeCalibrationPayload(body.calibration);
+  const timestamp = nowIso();
+  db.prepare(`
+    INSERT INTO camera_calibrations (facility_id, calibration_json, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(facility_id) DO UPDATE SET
+      calibration_json = excluded.calibration_json,
+      updated_at = excluded.updated_at
+  `).run(facility.id, JSON.stringify(calibration), timestamp);
+
+  return getWorkspace(userId);
 }
 
 export function reassignDriver(userId) {

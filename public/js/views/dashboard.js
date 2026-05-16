@@ -135,6 +135,36 @@ function renderDetection(state) {
           <tbody data-camera-map-body>${cameraMapRows(workspace)}</tbody>
         </table>
       </div>
+      <div class="panel calibration-panel">
+        <h3>Camera calibration</h3>
+        <p class="panel-copy">Draw this camera's real stall and lane zones before scoring occupancy changes.</p>
+        <div class="video-controls-grid">
+          <div class="field">
+            <label for="calibrationType">Zone type</label>
+            <select id="calibrationType" data-calibration-type>
+              <option value="space">Parking stall</option>
+              <option value="lane">Drive lane</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="calibrationLabel">Zone ID</label>
+            <input id="calibrationLabel" data-calibration-id value="P1">
+          </div>
+        </div>
+        <div class="calibration-stage">
+          <canvas data-calibration-canvas aria-label="Camera calibration drawing surface"></canvas>
+          <video data-calibration-video muted playsinline></video>
+        </div>
+        <div class="calibration-actions">
+          <button class="button" type="button" data-action="calibration-add-zone">${icon('plus')} Finish zone</button>
+          <button class="button secondary" type="button" data-action="calibration-undo-point">Undo point</button>
+          <button class="button secondary" type="button" data-action="calibration-clear">Clear</button>
+          <button class="button secondary" type="button" data-action="calibration-import-json">Load JSON</button>
+          <button class="button secondary" type="button" data-action="calibration-download">Download JSON</button>
+          <button class="button" type="button" data-action="calibration-save">Save calibration</button>
+        </div>
+        <div class="video-status" data-calibration-status>Load footage, then click the frame to place polygon points.</div>
+      </div>
       <div class="panel vision-panel">
         <h3>Real-world CV detector</h3>
         <p class="panel-copy">Upload parking-lot footage and run the local YOLO/OpenCV detector. The template JSON is only a starting point; replace it with this camera's actual stall and lane polygons before scoring spaces.</p>
@@ -286,7 +316,7 @@ function allFacilities(workspace) {
   return workspace.properties.flatMap((property) => property.facilities);
 }
 
-function defaultVisionCalibration() {
+export function defaultVisionCalibration() {
   return {
     spaces: [
       { id: 'P1', points: [[0.15, 0.24], [0.255, 0.24], [0.255, 0.43], [0.15, 0.43]] },

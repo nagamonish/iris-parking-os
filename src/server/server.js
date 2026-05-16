@@ -10,6 +10,7 @@ import db, {
   recordCameraTestEvent,
   reassignDriver,
   runCameraScan,
+  saveFacilityCalibration,
   seedWorkspace
 } from './db.js';
 import {
@@ -246,6 +247,12 @@ async function handleApi(req, res, url) {
     if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can record camera events.');
     recordCameraTestEvent(user.id, await readJson(req));
     return sendJson(res, 201, { workspace: getWorkspace(user.id) });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/facility-calibration') {
+    if (user.role !== 'provider') return sendError(res, 403, 'Only operator accounts can save camera calibrations.');
+    const workspace = saveFacilityCalibration(user.id, await readJson(req));
+    return sendJson(res, 200, { workspace });
   }
 
   if (req.method === 'POST' && url.pathname === '/api/driver/reassign') {

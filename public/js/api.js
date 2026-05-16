@@ -25,6 +25,7 @@ export const api = {
   addFacility: (body) => request('/api/facilities', { method: 'POST', body: JSON.stringify(body) }),
   scan: () => request('/api/scan', { method: 'POST', body: JSON.stringify({}) }),
   cameraEvent: (body) => request('/api/camera-events', { method: 'POST', body: JSON.stringify(body) }),
+  saveCalibration: (body) => request('/api/facility-calibration', { method: 'POST', body: JSON.stringify(body) }),
   visionAnalyze: (body, options = {}) => fetch('/api/vision/analyze', { method: 'POST', credentials: 'same-origin', body, ...options }),
   reassign: () => request('/api/driver/reassign', { method: 'POST', body: JSON.stringify({}) })
 };

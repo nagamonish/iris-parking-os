@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { escapeHtml, formatNumber } from './components.js';
 import { renderAuth, renderAuthPage, STORY_SCENE_COUNT } from './views/auth.js';
-import { renderShell } from './views/dashboard.js';
+import { defaultVisionCalibration, renderShell } from './views/dashboard.js';
 
 const app = document.getElementById('app');
 const SCENE_SCROLL_THRESHOLD = 225;
@@ -61,7 +61,20 @@ const visionRun = {
   active: false,
   events: 0,
   file: null,
-  truthFile: null
+  truthFile: null,
+  facilityId: ''
+};
+const calibrationTool = {
+  videoUrl: '',
+  frameCanvas: null,
+  frameWidth: 1280,
+  frameHeight: 720,
+  zones: [],
+  draftPoints: [],
+  loadedFacilityId: '',
+  nextSpaceNumber: 1,
+  nextLaneNumber: 1,
+  pointer: null
 };
 
 function applyTheme(theme) {
@@ -97,6 +110,7 @@ function render() {
       : renderAuth(state);
 
   queueMicrotask(scheduleStorySceneEffects);
+  queueMicrotask(hydrateDetectionView);
 }
 
 function formData(form) {
@@ -339,6 +353,319 @@ function refreshDetectionSurface(workspace) {
   if (eventLog) eventLog.innerHTML = eventList(workspace);
 }
 
+function calibrationForFacility(facilityId) {
+  return state.workspace?.calibrations?.[facilityId]?.calibration || null;
+}
+
+function selectedVisionFacilityId() {
+  const select = app.querySelector('[data-vision-facility]');
+  return select?.value || visionRun.facilityId || workspaceFacilities()[0]?.id || '';
+}
+
+function setCalibrationStatus(message, tone = '') {
+  const status = app.querySelector('[data-calibration-status]');
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+}
+
+function roundCoord(value) {
+  return Number(Math.max(0, Math.min(1, value)).toFixed(4));
+}
+
+function cloneCalibration(calibration) {
+  return JSON.parse(JSON.stringify(calibration || { spaces: [], lanes: [] }));
+}
+
+function zonesFromCalibration(calibration) {
+  const payload = cloneCalibration(calibration);
+  return [
+    ...(payload.spaces || []).map((zone) => ({ type: 'space', id: String(zone.id || ''), points: zone.points || [] })),
+    ...(payload.lanes || []).map((zone) => ({ type: 'lane', id: String(zone.id || ''), points: zone.points || [] }))
+  ].filter((zone) => zone.id && zone.points.length >= 3);
+}
+
+function calibrationFromZones() {
+  const spaces = calibrationTool.zones
+    .filter((zone) => zone.type === 'space')
+    .map((zone) => ({ id: zone.id, points: zone.points.map(([x, y]) => [roundCoord(x), roundCoord(y)]) }));
+  const lanes = calibrationTool.zones
+    .filter((zone) => zone.type === 'lane')
+    .map((zone) => ({ id: zone.id, points: zone.points.map(([x, y]) => [roundCoord(x), roundCoord(y)]) }));
+  return {
+    spaces,
+    lanes,
+    notes: 'Camera-specific calibration drawn in the operator console.'
+  };
+}
+
+function updateNextCalibrationIds() {
+  const numbers = (type, prefix) => calibrationTool.zones
+    .filter((zone) => zone.type === type)
+    .map((zone) => Number(String(zone.id).replace(prefix, '')))
+    .filter(Number.isFinite);
+  calibrationTool.nextSpaceNumber = Math.max(0, ...numbers('space', 'P')) + 1;
+  calibrationTool.nextLaneNumber = Math.max(0, ...numbers('lane', 'lane_')) + 1;
+}
+
+function setSuggestedCalibrationId() {
+  const type = app.querySelector('[data-calibration-type]')?.value || 'space';
+  const input = app.querySelector('[data-calibration-id]');
+  if (!input) return;
+  input.value = type === 'lane' ? `lane_${calibrationTool.nextLaneNumber}` : `P${calibrationTool.nextSpaceNumber}`;
+}
+
+function syncCalibrationTextarea() {
+  const textarea = app.querySelector('[data-vision-calibration]');
+  if (!textarea) return;
+  textarea.value = JSON.stringify(calibrationFromZones(), null, 2);
+}
+
+function readCalibrationTextarea() {
+  const textarea = app.querySelector('[data-vision-calibration]');
+  try {
+    return JSON.parse(textarea?.value || '{}');
+  } catch {
+    setCalibrationStatus('Calibration JSON is invalid.', 'error');
+    return null;
+  }
+}
+
+function loadCalibrationIntoEditor(calibration, message = 'Calibration loaded.') {
+  calibrationTool.zones = zonesFromCalibration(calibration);
+  calibrationTool.draftPoints = [];
+  updateNextCalibrationIds();
+  setSuggestedCalibrationId();
+  syncCalibrationTextarea();
+  redrawCalibrationCanvas();
+  setCalibrationStatus(message, calibrationTool.zones.length ? 'live' : '');
+}
+
+function loadFacilityCalibration(facilityId) {
+  calibrationTool.loadedFacilityId = facilityId;
+  const saved = calibrationForFacility(facilityId);
+  loadCalibrationIntoEditor(saved || defaultVisionCalibration(), saved ? 'Saved facility calibration loaded.' : 'Template calibration loaded.');
+}
+
+function hydrateDetectionView() {
+  const facilitySelect = app.querySelector('[data-vision-facility]');
+  if (!facilitySelect) return;
+
+  const facilities = workspaceFacilities();
+  if (!visionRun.facilityId || !facilities.some((facility) => facility.id === visionRun.facilityId)) {
+    visionRun.facilityId = facilitySelect.value || facilities[0]?.id || '';
+  }
+  if (visionRun.facilityId) facilitySelect.value = visionRun.facilityId;
+
+  if (calibrationTool.loadedFacilityId !== visionRun.facilityId) {
+    loadFacilityCalibration(visionRun.facilityId);
+  } else {
+    syncCalibrationTextarea();
+    redrawCalibrationCanvas();
+  }
+
+  if (visionRun.file && !calibrationTool.frameCanvas) {
+    loadCalibrationFrame(visionRun.file);
+  }
+}
+
+function drawPolygon(context, zone, isDraft = false) {
+  if (!zone.points.length) return;
+  const color = zone.type === 'lane' ? '#576a71' : '#96b8cb';
+  const accent = zone.type === 'lane' ? 'rgba(87, 106, 113, 0.22)' : 'rgba(150, 184, 203, 0.24)';
+  context.beginPath();
+  zone.points.forEach(([x, y], index) => {
+    const px = x * calibrationTool.frameWidth;
+    const py = y * calibrationTool.frameHeight;
+    if (index === 0) context.moveTo(px, py);
+    else context.lineTo(px, py);
+  });
+  if (!isDraft) context.closePath();
+  context.fillStyle = accent;
+  context.strokeStyle = color;
+  context.lineWidth = isDraft ? 3 : 4;
+  if (!isDraft) context.fill();
+  context.stroke();
+
+  zone.points.forEach(([x, y]) => {
+    context.beginPath();
+    context.arc(x * calibrationTool.frameWidth, y * calibrationTool.frameHeight, 5, 0, Math.PI * 2);
+    context.fillStyle = color;
+    context.fill();
+    context.strokeStyle = 'rgba(255, 255, 255, 0.82)';
+    context.lineWidth = 2;
+    context.stroke();
+  });
+
+  if (!isDraft) {
+    const [x, y] = zone.points[0];
+    context.font = '700 18px Inter, system-ui, sans-serif';
+    context.fillStyle = '#f8f9f7';
+    context.strokeStyle = 'rgba(0, 0, 0, 0.58)';
+    context.lineWidth = 4;
+    context.strokeText(zone.id, x * calibrationTool.frameWidth + 10, y * calibrationTool.frameHeight + 24);
+    context.fillText(zone.id, x * calibrationTool.frameWidth + 10, y * calibrationTool.frameHeight + 24);
+  }
+}
+
+function redrawCalibrationCanvas() {
+  const canvas = app.querySelector('[data-calibration-canvas]');
+  if (!canvas) return;
+  canvas.width = calibrationTool.frameWidth;
+  canvas.height = calibrationTool.frameHeight;
+  const context = canvas.getContext('2d');
+  context.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (calibrationTool.frameCanvas) {
+    context.drawImage(calibrationTool.frameCanvas, 0, 0, canvas.width, canvas.height);
+    context.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  } else {
+    context.fillStyle = '#11131d';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = 'rgba(226, 229, 226, 0.12)';
+    context.lineWidth = 1;
+    for (let x = 0; x <= canvas.width; x += canvas.width / 8) {
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, canvas.height);
+      context.stroke();
+    }
+    for (let y = 0; y <= canvas.height; y += canvas.height / 6) {
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(canvas.width, y);
+      context.stroke();
+    }
+  }
+
+  calibrationTool.zones.forEach((zone) => drawPolygon(context, zone));
+  const type = app.querySelector('[data-calibration-type]')?.value || 'space';
+  const draft = { type, id: 'draft', points: [...calibrationTool.draftPoints] };
+  if (calibrationTool.pointer && draft.points.length) draft.points.push(calibrationTool.pointer);
+  drawPolygon(context, draft, true);
+}
+
+function captureCalibrationFrame(video) {
+  const width = video.videoWidth || 1280;
+  const height = video.videoHeight || 720;
+  calibrationTool.frameWidth = width;
+  calibrationTool.frameHeight = height;
+  const frame = document.createElement('canvas');
+  frame.width = width;
+  frame.height = height;
+  frame.getContext('2d').drawImage(video, 0, 0, width, height);
+  calibrationTool.frameCanvas = frame;
+  redrawCalibrationCanvas();
+  setCalibrationStatus('Frame ready for calibration.', 'live');
+}
+
+function loadCalibrationFrame(file) {
+  const video = app.querySelector('[data-calibration-video]');
+  if (!video || !file) return;
+  if (calibrationTool.videoUrl) URL.revokeObjectURL(calibrationTool.videoUrl);
+  calibrationTool.videoUrl = URL.createObjectURL(file);
+  calibrationTool.frameCanvas = null;
+  video.src = calibrationTool.videoUrl;
+  video.preload = 'metadata';
+  video.load();
+  video.onloadedmetadata = () => {
+    const targetTime = Number.isFinite(video.duration) ? Math.min(1.2, Math.max(0.1, video.duration * 0.08)) : 0.1;
+    video.currentTime = targetTime;
+  };
+  video.onseeked = () => captureCalibrationFrame(video);
+  video.onloadeddata = () => {
+    if (!calibrationTool.frameCanvas) captureCalibrationFrame(video);
+  };
+  video.onerror = () => setCalibrationStatus('This video codec cannot be previewed in the browser. Paste or load calibration JSON instead.', 'error');
+  setCalibrationStatus('Loading calibration frame...');
+}
+
+function calibrationPointFromEvent(event) {
+  const canvas = app.querySelector('[data-calibration-canvas]');
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+  return [
+    roundCoord((event.clientX - rect.left) / rect.width),
+    roundCoord((event.clientY - rect.top) / rect.height)
+  ];
+}
+
+function addCalibrationPoint(event) {
+  const point = calibrationPointFromEvent(event);
+  if (!point) return;
+  calibrationTool.draftPoints.push(point);
+  calibrationTool.pointer = null;
+  redrawCalibrationCanvas();
+  setCalibrationStatus(`${calibrationTool.draftPoints.length} point${calibrationTool.draftPoints.length === 1 ? '' : 's'} placed.`);
+}
+
+function finishCalibrationZone() {
+  const type = app.querySelector('[data-calibration-type]')?.value || 'space';
+  const input = app.querySelector('[data-calibration-id]');
+  const id = String(input?.value || '').trim();
+  if (calibrationTool.draftPoints.length < 3) {
+    setCalibrationStatus('Place at least 3 points before finishing a zone.', 'error');
+    return;
+  }
+  if (!id) {
+    setCalibrationStatus('Enter a zone ID before finishing.', 'error');
+    return;
+  }
+  calibrationTool.zones.push({ type, id, points: [...calibrationTool.draftPoints] });
+  calibrationTool.draftPoints = [];
+  updateNextCalibrationIds();
+  setSuggestedCalibrationId();
+  syncCalibrationTextarea();
+  redrawCalibrationCanvas();
+  setCalibrationStatus(`${id} added to calibration.`, 'live');
+}
+
+function clearCalibrationDraft() {
+  if (calibrationTool.draftPoints.length) {
+    calibrationTool.draftPoints = [];
+  } else {
+    calibrationTool.zones = [];
+    updateNextCalibrationIds();
+    setSuggestedCalibrationId();
+    syncCalibrationTextarea();
+  }
+  redrawCalibrationCanvas();
+  setCalibrationStatus('Calibration editor cleared.');
+}
+
+function downloadCalibrationJson() {
+  const calibration = readCalibrationTextarea() || calibrationFromZones();
+  const blob = new Blob([JSON.stringify(calibration, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'sightline-camera-calibration.json';
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function saveCalibration() {
+  const facilityId = selectedVisionFacilityId();
+  const calibration = readCalibrationTextarea();
+  if (!facilityId) {
+    setCalibrationStatus('Choose a facility before saving calibration.', 'error');
+    return;
+  }
+  if (!calibration) return;
+
+  try {
+    const { workspace } = await api.saveCalibration({ facilityId, calibration });
+    state.workspace = workspace;
+    calibrationTool.loadedFacilityId = facilityId;
+    refreshDetectionSurface(workspace);
+    setCalibrationStatus('Calibration saved to SQLite.', 'live');
+  } catch (error) {
+    setCalibrationStatus(error.message, 'error');
+  }
+}
+
 function setVideoStatus(message, tone = '') {
   const status = app.querySelector('[data-video-status]');
   if (!status) return;
@@ -400,6 +727,7 @@ function handleVisionFile(file, input = app.querySelector('[data-vision-input]')
   }
   visionRun.file = file;
   assignFileToInput(input, file);
+  loadCalibrationFrame(file);
   setVisionStatus(`${file.name} loaded. Start CV analysis when ready.`);
   appendVisionLine('Footage ready', `${file.name} · ${Math.max(1, Math.round(file.size / 1024 / 1024))} MB`);
   return true;
@@ -600,6 +928,7 @@ async function startVisionAnalysis() {
   const file = visionRun.file || fileInput?.files?.[0];
   const truthInput = app.querySelector('[data-truth-input]');
   const truthFile = visionRun.truthFile || truthInput?.files?.[0];
+  visionRun.facilityId = facilityId || visionRun.facilityId;
 
   if (!facilityId) {
     setVisionStatus('Choose a facility before analysis.', 'error');
@@ -756,6 +1085,33 @@ app.addEventListener('click', async (event) => {
       stopVisionAnalysis();
       return;
     }
+    if (action === 'calibration-add-zone') {
+      finishCalibrationZone();
+      return;
+    }
+    if (action === 'calibration-undo-point') {
+      calibrationTool.draftPoints.pop();
+      redrawCalibrationCanvas();
+      setCalibrationStatus('Last point removed.');
+      return;
+    }
+    if (action === 'calibration-clear') {
+      clearCalibrationDraft();
+      return;
+    }
+    if (action === 'calibration-import-json') {
+      const calibration = readCalibrationTextarea();
+      if (calibration) loadCalibrationIntoEditor(calibration, 'Calibration JSON loaded into editor.');
+      return;
+    }
+    if (action === 'calibration-download') {
+      downloadCalibrationJson();
+      return;
+    }
+    if (action === 'calibration-save') {
+      await saveCalibration();
+      return;
+    }
     if (action === 'video-test-start') {
       await startVideoTestFeed();
       return;
@@ -809,7 +1165,44 @@ app.addEventListener('change', (event) => {
   const truthInput = closestElement(event.target, '[data-truth-input]');
   if (truthInput?.files?.length) {
     handleTruthFile(truthInput.files[0], truthInput);
+    return;
   }
+
+  const facilitySelect = closestElement(event.target, '[data-vision-facility]');
+  if (facilitySelect) {
+    visionRun.facilityId = facilitySelect.value;
+    loadFacilityCalibration(visionRun.facilityId);
+    return;
+  }
+
+  const calibrationType = closestElement(event.target, '[data-calibration-type]');
+  if (calibrationType) {
+    setSuggestedCalibrationId();
+    redrawCalibrationCanvas();
+  }
+});
+
+app.addEventListener('pointermove', (event) => {
+  if (!closestElement(event.target, '[data-calibration-canvas]')) return;
+  calibrationTool.pointer = calibrationPointFromEvent(event);
+  redrawCalibrationCanvas();
+});
+
+app.addEventListener('pointerleave', (event) => {
+  if (!closestElement(event.target, '[data-calibration-canvas]')) return;
+  calibrationTool.pointer = null;
+  redrawCalibrationCanvas();
+});
+
+app.addEventListener('click', (event) => {
+  if (!closestElement(event.target, '[data-calibration-canvas]')) return;
+  addCalibrationPoint(event);
+});
+
+app.addEventListener('dblclick', (event) => {
+  if (!closestElement(event.target, '[data-calibration-canvas]')) return;
+  event.preventDefault();
+  finishCalibrationZone();
 });
 
 function closestDropZone(target) {
