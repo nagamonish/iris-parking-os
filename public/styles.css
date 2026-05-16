@@ -1853,7 +1853,7 @@ a {
 }
 
 .detection-grid {
-  grid-template-columns: minmax(360px, 0.95fr) minmax(360px, 0.85fr) minmax(360px, 0.8fr);
+  grid-template-columns: minmax(320px, 0.75fr) minmax(420px, 1.25fr);
   align-items: start;
 }
 
@@ -1870,9 +1870,14 @@ a {
 }
 
 .video-test-panel,
-.vision-panel {
+.vision-panel,
+.calibration-panel {
   display: grid;
   gap: 14px;
+}
+
+.vision-panel {
+  grid-column: 1 / -1;
 }
 
 .video-controls-grid {
@@ -1926,10 +1931,47 @@ a {
   border: 1px solid var(--line);
 }
 
+.calibration-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #11131d;
+  border: 1px solid var(--line);
+  box-shadow: inset 0 0 0 1px rgba(226, 229, 226, 0.04);
+}
+
+.calibration-stage canvas {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.calibration-stage video {
+  position: absolute;
+  inset: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .video-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.calibration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.calibration-actions .button {
+  min-height: 38px;
 }
 
 .video-status {
@@ -2151,6 +2193,11 @@ a {
 
   .metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calibration-panel,
+  .vision-panel {
+    grid-column: auto;
   }
 }
 
@@ -2438,6 +2485,10 @@ a {
   .role-grid,
   .video-controls-grid {
     grid-template-columns: 1fr;
+  }
+
+  .calibration-actions .button {
+    flex: 1 1 140px;
   }
 
   .topbar,
